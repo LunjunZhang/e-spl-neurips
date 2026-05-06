@@ -17,6 +17,7 @@
 \usepackage{algorithm}
 \usepackage{algorithmic}
 \usepackage{float}
+\usepackage{placeins}
 
 \usepackage{amsmath}
 \usepackage{amssymb}
@@ -235,101 +236,6 @@ Evolutionary and search-based approaches such as EvoPrompt \citep{evoprompt}, Pr
 \vspace{-5pt}
 \paragraph{Evolutionary Algorithms and Genetic Programming} Hybrid Evolution+RL approaches \citep{erl, jaderberg2017population, cem-rl} leverage population dynamics to complement gradient-based optimization. More recently, FunSearch \citep{romera2024mathematical} and AlphaEvolve \citep{alphaevolve} demonstrate that LLM-guided evolutionary search over programs can yield novel discoveries. The Darwin Gödel Machine \citep{darwin-godel-machine} applies self-referential modification to agentic prompts but does not update model weights. Classical genetic programming \citep{koza1994genetic, langdon2013foundations} refines candidate programs via mutation and crossover; an LLM under a system prompt can be viewed as such a program \citep{gepa, alphaevolve}, with LLM-designed genetic operators \citep{hemberg2024evolving}. Unlike prior work that combines LLM evolution with DPO \citep{dpo} for combinatorial tasks, E-SPL tackles the more general setting of LLM post-training, jointly optimizing system prompts and model weights in a single loop without additional agentic scaffold \citep{ai-co-scientist}.
 
-\begin{figure}[!tb]
-\centering
-
-\caption{\centering
-\textbf{An example of the system prompt discovered by E-SPL for RL with search engines. Here, the discovered system prompt specifies a workflow that includes: {\color{Brown}\textbf{generative self-verification}, \textbf{detailed instructions on tool use}, \textbf{critical formatting rules}, \textbf{heuristics for determining the reliability of various information sources}, \textbf{actionable guidance for avoiding common failure modes}, etc.}}
-}
-\label{tab:prompt-evolution-search}
-
-\begin{runcard}[title={System Prompt for RL Agent with Search Engine (openai gpt-oss-120b)}]
-
-\medskip
-\begin{runbox}[title={System Prompt \emph{Before} E-SPL}]
-
-You are an expert assistant who solves tasks using a Wikipedia search tool.
-
-{Here is an example of solving a real question:}
-
-{
-``Between 2020 and 2025, which year did New York City see the most population growth and how did San Francisco population change in that year?"
-} \quad {\color{gray}$\cdots$}
-
-{
-Calling search tool:
-\texttt{<tool\_call>\{"name": "search", "arguments": \{"query\_list": ["Population New York City between 2020 and 2025"]\}\}</tool\_call>}
-}
-
-{\quad $\cdots$}
-
-\end{runbox}
-
-\begin{runbox}[title={\textbf{System Prompt \emph{After} E-SPL}}]
-
-You are an expert research assistant. \quad $\cdots$ 
-\quad 
-\textbf{\color{Brown}Workflow (follow \emph{exactly} in this order) \quad $\boldsymbol{\cdots}$}
-
-\medskip
-\textbf{3. Call the search tool once} — Use \textbf{exactly} this syntax \quad $\cdots$ 
-
-\medskip
-\textbf{4. Verification block} — For each result returned, 
-\textbf{\textcolor{Brown}{output the following four lines in this order and nothing else}}:
-
-\smallskip
-\texttt{Source: <domain>} \\
-\texttt{Summary: <one-sentence summary>} \\
-\texttt{Status: VERIFIED (or NOT VERIFIED)} \\
-\texttt{Phrase: "<exact phrase>"} \ \ (only if Status is VERIFIED)
-
-\medskip
-\textbf{\textcolor{Brown}{A result is VERIFIED only if:}}
-
-\begin{itemize}
-  \item the exact target phrase appears verbatim in the snippet, \textbf{and}
-  \item the domain ends with \texttt{.org}, \texttt{.edu}, \texttt{.gov}, is Wikipedia, 
-  \textbf{or} a major reputable outlet (e.g., \texttt{nytimes.com}, \texttt{bbc.com}, \texttt{reuters.com}, \texttt{theguardian.com})
-\end{itemize}
-
-If the domain is not on this list, mark the result \textbf{NOT VERIFIED} even if the phrase is present.
-
-\medskip
-\textbf{5. Refine query (optional)} — 
-\textbf{\textcolor{Brown}{If all results are NOT VERIFIED, modify the query and repeat Step 3.}}
-
-\medskip
-\textbf{Critical formatting rules (must be obeyed)}
-
-\begin{itemize}
-  \item All tool calls must be wrapped exactly as \texttt{<tool\_call>\{...\}</tool\_call>}
-  \item The only user-visible output after verification is the single \texttt{Answer:} line; {{no bullet points, markdown, blank lines, or extra text}}
-\end{itemize}
-
-\textbf{Positive example (correct flow)}
-
-\smallskip
-\texttt{User: "What other name is used for the 4 × 400 m relay?"} \\
-\texttt{Query: "4 x 400 metres relay"} \\
-\texttt{<tool\_call>\{"name": "search", "arguments": \{"query\_list": ["4 x 400 metres relay"]\}\}</tool\_call>} \\
-\texttt{Source: en.wikipedia.org} \\
-\texttt{Summary: The 4 x 400 metres relay is also known as the "long relay".} \\
-\texttt{Status: VERIFIED} \\
-\texttt{Phrase: "long relay"} \quad $\cdots$
-
-\medskip
-\textbf{\textcolor{Brown}{
-Follow exactly this loop for every user query. 
-Your objective is to prove the answer with a verbatim phrase from a reliable source 
-before you \emph{everr} write the final \texttt{Answer:} line.
-}}
-
-\end{runbox}
-\end{runcard}
-
-\end{figure}
-
 
 
 \section{Method}
@@ -408,221 +314,17 @@ Our EA reuses RL rollout statistics directly, eliminating the held-out evaluatio
 \paragraph{Mutation} We mutate only the best-performing prompt $\mathbf{s}_k$ ($k \leftarrow \mathrm{argmax}_{i} V_{i}$), creating direct evolutionary pressure: \textbf{only the prompt that outperforms all competitively selected peers reproduces}. The reference policy $\pi_{\text{ref}}$ first self-reflects on the rollouts under $\mathbf{s}_k$ to produce lessons $\ell \sim \pi_{\text{ref}}(\cdot \mid \Psi_{\text{reflect}}, \{(x, y_{k,j}, r_{k,j})\}_{j=1}^{N})$, then proposes edits $\mathrm{diff} \sim \pi_{\text{ref}}(\cdot \mid \mathbf{s}_{k}, \ell)$ applied as $\mathbf{s}_{\text{mutate}} \leftarrow \mathrm{git}.\mathrm{apply}(\mathbf{s}_{k}, \mathrm{diff})$. The child is added to $\mathcal{S}$ with rating $(\mu_{k}, \sigma_{k}+\Delta \sigma)$; inheriting the parent's rating with increased uncertainty favors exploration.
 
 
-\begin{figure}[t]
-\vspace{0pt}
-  \centering
-  \includegraphics[width=0.95\textwidth]{figures/evo-tree-4-v2.pdf}
-  \label{fig:evo-tree-1}
-  \vspace{-2pt}
-  \caption{\textbf{TrueSkill scores learned from train-time rankings are predictive of relative test-time performance of system prompts.} E-SPL treats each RL iteration as a set of relative comparisons between system prompts for TrueSkill message passing. The visualization shows that E-SPL effectively aggregates noisy train-time comparisons into a stable and informative criterion for evolutionary selection.}
-  \vspace{-5pt}
-\end{figure}
-
 \vspace{-5pt}
 \paragraph{Crossover} While mutation evolves individual lineages, crossover recombines knowledge across parents. We evaluate $M$ prompts on a batch $\mathcal{B}$ of $B$ problems, yielding a score matrix $\Phi \in \mathbb{R}^{M\times B}$ where $\Phi_{i,b}$ captures the per-problem advantage of each prompt. The problem-wise strengths identified by $\Phi$ are incorporated into the crossover reflection prompt $\Psi_{\mathrm{cr}}$, grounding self-reflection in concrete differential advantages and enabling targeted recombination. The resulting $\mathbf{s}_{\text{crossover}}$ is added to $\mathcal{S}$ with a precision-weighted average of the parents’ ratings (\cref{alg:crossover}).
 
 \vspace{-5pt}
 \paragraph{Summary} E-SPL augments RL post-training with an evolutionary algorithm based on self-reflection from experience. In parallel with RL updates, E-SPL uses relative performance rankings of system prompts to inform evolutionary selection. Mutation and crossover operators, both driven by LLM self-reflection, produce new system prompts with minimal computational overhead.
 
-\begin{figure}[!tb]
-\centering
-\caption{\textbf{An example of how the RL model learns to utilize learned system prompts} (numbered G1 $\dots$ G30) \textbf{to solve problems.}}
 
-\begin{runcard}[title={Example of How E-SPL Shapes Model Behavior}]
-
-\medskip
-
-\begin{runbox}[title={\textbf{Learned System Prompt}}]
-When solving math problems, you MUST first carefully read and understand the helpful instructions and principles below:
-
-\textbf{\color{Brown}\hl{{[G1]}}. When optimizing sums, set parameters to cancel dominant terms. For quadratic forms, choose parameters that minimize the leading coefficients, reducing the problem to analyzing remainder terms.}
-
-$\cdots$
-
-\textbf{\color{Brown}\hl{{[G22]}}. In modular arithmetic and sums, decompose terms via remainders or moduli. Use periodicity for remainder sums and CRT for coprime factors, ensuring multiplicative solutions for square-free moduli.}
-
-$\cdots$
-\end{runbox}
-
-\begin{runbox}[title={Problem}]
-Let \(\mathbb{Z}/n\mathbb{Z}\) be the set of all integers modulo \(n\) (hence \(\mathbb{Z}/n\mathbb{Z}\) contains \(n\) elements). Find the second smallest composite number \(n\), such that there exists a bijective function \(g:\mathbb{Z}/n\mathbb{Z}\to \mathbb{Z}/n\mathbb{Z}\) such that the \(101\) functions
-\[ g(x),\ g(x)+x,\ g(x)+2x,\ \cdots,\ g(x)+100x \]
-are all bijective from \(\mathbb{Z}/n\mathbb{Z}\) to \(\mathbb{Z}/n\mathbb{Z}\).
-\end{runbox}
-
-\begin{runbox}[title={Model Output}]
-\textbf{Understanding the Condition:}
-Each function \(h_k(x) = g(x) + kx\) (for \(k=0,1,\ldots,100\)) must be a permutation of \(\mathbb{Z}/n\mathbb{Z}\). Since \(g\) is bijective, \(h_0(x)=g(x)\) is bijective by assumption. For \(k \geq 1\), \(h_k\) is bijective if and only if for every \(a \in \mathbb{Z}/n\mathbb{Z}\), the equation \(g(x) + kx = a\) has a unique solution \(x\).
-
-\textbf{Alternatively}, since \(g\) is a permutation, we can set \(y = g(x)\) and then \(x = g^{-1}(y)\), so
-$
-h_k(g^{-1}(y)) = y + k g^{-1}(y).
-$
-{But perhaps} a better approach is to consider the differences.
-\textbf{Note:}
-\(h_k\) is bijective if and only if the map \(x \mapsto g(x) + kx\) is injective. That is, if
-$
-g(x) + kx = g(y) + ky
-$
-then \(x = y\). Equivalently,
-$
-g(x) - g(y) = -k(x-y).
-$
-Since \(g\) is arbitrary (but fixed for all \(k\)), we need to choose \(g\) such that for each \(k=1,\ldots,100\), the equation \(g(x) - g(y) = -k(x-y)\) implies \(x=y\).
-
-\textbf{Alternatively}, we can think about the differences: for each nonzero \(d \in \mathbb{Z}/n\mathbb{Z}\), we require that
-$
-g(x+d) - g(x) \neq -k d
-$
-for all \(x\) and for all \(k=0,\ldots,100\). Actually, injectivity of \(h_k\) is equivalent to: if \(x \neq y\), then
-$
-g(x) + kx \neq g(y) + ky,
-$
-i.e., \(g(x)-g(y) \neq -k(x-y)\). So for each nonzero \(d\), and for each \(k\), we require that \(g(x+d) - g(x) \neq -k d\) for all \(x\). \textbf{But} since \(g\) is a permutation, this is not easy to control.
-
-\textbf{Another idea}: Consider the composition \(h_k \circ g^{-1}\). Let \(f = g^{-1} \). Then \(h_k(g^{-1}(y)) = y + k f(y)\) $\cdots$
-
-$\dots$
-
-\textbf{But let's think}: For $n$ to work, it must be that all prime factors are at least $103$? But that gives large numbers.
-
-{Maybe} there is a trick: The number $101$ is prime. So perhaps $n$ must be coprime to $101$! or something.
-
-\textbf{Another idea}: Consider the function for $k=101$? Not required.
-
-\medskip
-{\color{Brown}\textbf{Given the instructions, we should use \hl{[G22]}: In modular arithmetic, use CRT.}}
-
-If $n=$ product of primes, then by CRT, the condition holds if and only if it holds for each prime power factor.
-
-So for each $p^a$ dividing $n$, there exists a bijection $g_p$ on $Z/p^a$ such that the $101$ functions are bijective.
-
-For a prime $p > 101$, take $g(x)=x$ works. For $p <= 101$, we need to see if there is a bijection on $Z/p^a$.
-
-So the smallest composite would be one that has no prime factor $<=101$, i.e., all factors $>=103$. So the smallest is $103^2=10609$. But then the second smallest would be $103\times 107=11021$. \quad $\dots$
-
-\medskip
-\textbf{Final Answer:} 
-\[
-\boxed{11021}
-\]
-
-\end{runbox}
-
-\textbf{Ground truth answer:} $11021$
-\end{runcard}
-\label{tab:example-e-spl-1}
-
-\end{figure}
-
-
-
-
-\begin{figure}[!tb]
-\centering
-\caption{\textbf{An example of how the RL model learns to utilize learned system prompts to solve problems.}}
-
-\begin{runcard}[title={Example of How E-SPL Shapes Model Behavior}]
-
-\medskip
-
-\begin{runbox}[title={\textbf{Learned System Prompt}}]
-When solving math problems, you MUST first carefully read and understand the helpful instructions and principles below:
-
-$\cdots$
-
-\textbf{\color{Brown}\hl{{[G26]}}. After deriving results, perform sanity checks: test small instances, ensure bounds, and verify extreme cases. Re-examine complex steps if results seem off.}
-
-$\cdots$
-\end{runbox}
-
-\begin{runbox}[title={Problem}]
-Real numbers \(x_1,x_2,\cdots,x_n\) satisfy
-\(|x_1|+|x_2|+\cdots+|x_{3526}| = 1\). Let \(M\) be the maximal possible value of 
-\[
-\frac{1}{|x_1|+|x_1 - x_2|+|x_1 + x_2 - x_3|+\cdots+|x_1 + x_2+\cdots+x_{3525}-x_{3526}|}
-\]
-Find \(M\mod 1000\).
-
-\end{runbox}
-
-\begin{runbox}[title={Model Output}]
-
-\textbf{Let's analyze the problem step by step:}
-
-Let \(S_k = x_1 + x_2 + \cdots + x_k\) for \(k=1,2,\dots,3526\), with \(S_0 = 0\). Then the denominator becomes:
-$
-|S_1| + |S_1 - S_2| + |S_2 - S_3| + \cdots + |S_{3525} - S_{3526}|.
-$
-But note: \(S_1 = x_1\), \(S_1 - S_2 = -x_2\), \(S_2 - S_3 = -x_3\), $\cdots$, \(S_{3525} - S_{3526} = -x_{3526}\). So the denominator is:
-$
-|S_1| + |x_2| + |x_3| + \cdots + |x_{3526}|.
-$
-However, this is not exactly matching the given expression. Actually, the given terms are:\quad $\dots$
-
-$\dots$
-
-The correct maximum is actually $2$, achieved by the first construction with all terms zero except the last.
-
-Therefore, $M = 2$. Then $M \mod 1000 = 2$.
-
-\textbf{So the answer is $\boldsymbol{2}$.} This is the simplest.
-
-\medskip
-{\color{Brown}\textbf{Given the instructions \hl{[G26]}: perform sanity checks.}}
-
-For $n=2$: variables $x_1$, $x_2$ with $|x_1|+|x_2|=1$. $D = 1/( |x1| + |x1-x2| )$. \quad $\cdots$  
-So for $n=2$, maximum is $2$.
-
-For $n=3$: maximize $D = 1/( |x1| + |x1-x2| + |x1+x2-x3| )$. \quad $\cdots$ 
-So for $n=3$, we can get $D=4$.
-
-In general, for $n$, the construction is: $x_1 = a$, $x_2 = a$, $x_3 = 2a$, $x_4 = 4a$, ..., $x_n = 2^{n-2} a$. Then $|x_1| = |a|$, $|x_1-x_2| = 0$, $|x_1+x_2-x_3| = 0$, ..., $|x_1+...+x_{n-1}-x_n| = | (2^{n-1} - 1)a - 2^{n-2} a | = | (2^{n-2} - 1)a |$.
-
-\medskip
-\textbf{Wait, careful}: $S_{n-1} = a + a + 2a + 4a + ... + 2^{n-3} a = (2^{n-2} - 1)a + a = 2^{n-2} a$.
-
-Then $S_{n-1} - x_n = 2^{n-2} a - 2^{n-2} a = 0$.
-
-So all terms after the first are $0$ except the second which is $0$.
-
-So denominator $= |a|$.
-
-Constraint: $|a| + |a| + |2a| + |4a| + ... + |2^{n-2} a| = |a| (2 + (2^{n-1} - 2)) = |a| * 2^{n-1} = 1$, so $|a| = 2^{1-n}$.
-
-Then $D = 2^{n-1}$.
-
-For $n=3526$, $D = 2^{3525}$. \textbf{This is huge, and integer.}
-
-\textbf{And it is better than the previous construction.}
-
-\medskip
-So the maximum is $M = 2^{3525}$. Then $M \mod 1000 = 2^{3525} \mod 1000$. 
-
-Now, we need to compute $2^{3525} \mod 1000$. \quad $\cdots$ \quad So $2^{3525} \equiv 432 \pmod{1000}$.
-
-\textbf{So the answer is $\boldsymbol{432}$}. This is the intended solution.
-
-\medskip
-\textbf{Final Answer}:
-\[
-\boxed{432}
-\]
-
-\end{runbox}
-
-\textbf{Ground truth answer:} $432$
-\end{runcard}
-\label{tab:example-e-spl-2}
-
-\end{figure}
-
-
-\vspace{-5pt}
+\FloatBarrier
 \section{Experiments}
 
-
-\begin{figure}[t]
+\begin{figure}[!t]
   \centering
   \vspace{0pt}
   \includegraphics[width=1.0\textwidth]{figures/main_results_v2.pdf}
@@ -667,17 +369,14 @@ We first focus on mathematical reasoning tasks with limited data, a regime in wh
 \end{figure}
 
 
-\begin{figure}[h]
+\begin{wrapfigure}{r}{0.4\textwidth}
+  \vspace{-12pt}
   \centering
-  \vspace{-5pt}
-  \hspace{-10pt}
-  \includegraphics[width=0.36\textwidth]{figures/agentic_search.pdf}
-  \label{fig:search-r1-results}
-  \vspace{-10pt}
-  \caption{{E-SPL outperforms both (prompt) Evolution and RL on agentic search tasks with openai gpt-oss-120b model.}}
+  \includegraphics[width=0.38\textwidth]{figures/agentic_search.pdf}
+  \caption{{E-SPL outperforms both Evolution and RL on agentic search tasks with gpt-oss-120b.}}
   \label{fig:agentic-search}
-  \vspace{-20pt}
-\end{figure}
+  \vspace{-12pt}
+\end{wrapfigure}
 
 \vspace{-8pt}
 \subsection{Main Results}
@@ -765,14 +464,6 @@ In solving math problems, a similar self-verification strategy emerged. In \auto
 \paragraph{Codified Domain Expertise and Heuristics} The learned system prompts also have many strategies that are highly domain-specific. For instance, \autoref{tab:example-e-spl-1} showcases learned system prompts such as \emph{`When optimizing sums, set parameters to cancel dominant terms. For quadratic forms, \dots'} (which is specific to problems that optimize sums) and \emph{`In modular arithmetic and sums, decompose terms via remainders or moduli. Use periodicity for remainder sums and CRT for coprime factors, ensuring multiplicative solutions for square-free moduli.'} (which points out the importance of Chinese Remainder Theorem, or \textit{CRT} for short, in solving modular arithmetic). Example \ref{tab:example-e-spl-1} shows that the RL model persistently explores many potential directions, repeating phrases like \emph{`Alternatively'}, \emph{`Another idea'}, \emph{`But let's think'}, before simplifying the problem to a form of modular arithmetic and recognizing that it should apply \textit{CRT} in that situation according to the system prompt. Example \ref{tab:example-e-spl-4-short} shows that the RL model cited a helpful heuristic in the system prompt suggesting the use of Möbius inversion under specific conditions, which became a crucial step in the solution. Those examples demonstrate that \textbf{E-SPL can effectively codify declarative knowledge into the system prompt -- specialized domain expertise and helpful problem-solving heuristics under various circumstances -- so that RL can focus on honing core reasoning skills} rather than memorizing domain knowledge.
 
 
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=0.8\textwidth]{figures/crossover_effect_v2.pdf}
-  \vspace{-6pt}
-  \caption{\textbf{Crossover operator in evolution speeds up early learning}, but obtains mixed results in terms of final performance. On AIME $\rightarrow$ BeyondAIME, Mutation + RL gets to $45.1\%$ success rate, while Mutation + Crossover + RL gets to $42.5\%$; on HMMT, using Crossover operator results in slightly better performance ($52.7\%$ vs $51.6\%$). In either case, Evolution + RL outperforms RL-only.}
-  \label{fig:crossover-ablation}
-  \vspace{-10pt}
-\end{figure}
 
 \vspace{-6pt}
 \paragraph{Failure Mode: Missing Caveats} Not all discovered strategies from E-SPL can hold true in the most general cases. In \autoref{tab:corrected-principles}, we study two cases where the learned system prompt included heuristics that are not strictly true in general but are still helpful in limited scenarios. For instance, in analyzing polynomials of a particular form, the discovered strategy misunderstood the lower bound of a min as the actual min. In the other case, the discovered principle for graph theory vaguely outlined an algorithm for finding a minimum $T$-join by \emph{`pairing odd vertices along efficient paths'}; the actual optimal solution requires \emph{pairing odd vertices via a minimum-weight perfect matching on shortest-path distances}. The likely reason for those mistakes is that E-SPL over-generalized some particular training data points or made mistakes in its self-reflection process. E-SPL is still missing caveats in many of its generalized principles. 
@@ -793,18 +484,16 @@ However, we argue that such mistakes in acquired knowledge are more transparent 
 \vspace{-8pt}
 Mutation-only behaves more like independent local hill-climbs along separate lineages. Lineages stay separated longer, so we can keep parallel hypotheses alive \citep{holland1992adaptation}. Mutation + Crossover accelerates early progress by re-combining partial improvements, but the population may rapidly converge around a locally high-performing system prompt, limiting exploration of qualitatively and structurally distinct high-quality solutions \citep{spears1993crossover}. Classically, this tradeoff can be significantly improved by a class of techniques called \emph{niching}, which include fitness sharing \citep{genetic-algorithm}, mating restriction \citep{investigation-of-species-formation}, and the island model \citep{island-model}. We leave the application of niching to E-SPL for future work.
 
-\begin{figure}[t]
+\begin{wrapfigure}{r}{0.4\textwidth}
+  \vspace{-12pt}
   \centering
-  \vspace{2pt}
-  \hspace{-2pt}
-  \includegraphics[width=0.35\textwidth]{figures/ablation_reflection_pol.pdf}
-  \vspace{0pt}
-  \caption{{Using a fixed reference policy rather than the online RL policy for prompt evolution is important to performance.}}
+  \includegraphics[width=0.38\textwidth]{figures/ablation_reflection_pol.pdf}
+  \caption{{Using a fixed reference policy rather than the online RL policy for prompt evolution is important.}}
   \label{fig:evo-pol-ablation}
-  \vspace{-20pt}
-\end{figure}
+  \vspace{-12pt}
+\end{wrapfigure}
 
-\vspace{-8pt}
+\vspace{-5pt}
 \paragraph{Sampling Policy for Evolution}
 Figure \ref{fig:evo-pol-ablation} evaluates the effect of using a fixed reference policy $\pi_{\text{ref}}$ for system prompt evolution, rather than the continually changing RL policy $\pi_{\theta}$. Using the fixed reference policy $\pi_{\text{ref}}$ for evolutionary updates consistently improves the final performance of E-SPL. This supports our design choice to keep evolutionary operators stationary: allowing the editor itself to drift alongside the policy introduces instability and degrades the quality of system prompt edits. A fixed reference policy provides a stable basis for self-reflection, mutation, and crossover.
 
@@ -878,6 +567,262 @@ We have shown that unifying RL and evolutionary prompt search significantly enha
 \newpage
 \appendix
 \section{Appendix Contents}
+
+\subsection{Additional Figures}
+
+\begin{figure}[t]
+\vspace{0pt}
+  \centering
+  \includegraphics[width=0.95\textwidth]{figures/evo-tree-4-v2.pdf}
+  \label{fig:evo-tree-1}
+  \vspace{-2pt}
+  \caption{\textbf{TrueSkill scores learned from train-time rankings are predictive of relative test-time performance of system prompts.} E-SPL treats each RL iteration as a set of relative comparisons between system prompts for TrueSkill message passing. The visualization shows that E-SPL effectively aggregates noisy train-time comparisons into a stable and informative criterion for evolutionary selection.}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.8\textwidth]{figures/crossover_effect_v2.pdf}
+  \vspace{-6pt}
+  \caption{\textbf{Crossover operator in evolution speeds up early learning}, but obtains mixed results in terms of final performance. On AIME $\rightarrow$ BeyondAIME, Mutation + RL gets to $45.1\%$ success rate, while Mutation + Crossover + RL gets to $42.5\%$; on HMMT, using Crossover operator results in slightly better performance ($52.7\%$ vs $51.6\%$). In either case, Evolution + RL outperforms RL-only.}
+  \label{fig:crossover-ablation}
+\end{figure}
+
+\subsection{Discovered System Prompt for Agentic Search}
+
+\begin{figure}[!tb]
+\centering
+
+\caption{\centering
+\textbf{An example of the system prompt discovered by E-SPL for RL with search engines. Here, the discovered system prompt specifies a workflow that includes: {\color{Brown}\textbf{generative self-verification}, \textbf{detailed instructions on tool use}, \textbf{critical formatting rules}, \textbf{heuristics for determining the reliability of various information sources}, \textbf{actionable guidance for avoiding common failure modes}, etc.}}
+}
+\label{tab:prompt-evolution-search}
+
+\begin{runcard}[title={System Prompt for RL Agent with Search Engine (openai gpt-oss-120b)}]
+
+\medskip
+\begin{runbox}[title={System Prompt \emph{Before} E-SPL}]
+
+You are an expert assistant who solves tasks using a Wikipedia search tool.
+
+{Here is an example of solving a real question:}
+
+{
+``Between 2020 and 2025, which year did New York City see the most population growth and how did San Francisco population change in that year?"
+} \quad {\color{gray}$\cdots$}
+
+{
+Calling search tool:
+\texttt{<tool\_call>\{"name": "search", "arguments": \{"query\_list": ["Population New York City between 2020 and 2025"]\}\}</tool\_call>}
+}
+
+{\quad $\cdots$}
+
+\end{runbox}
+
+\begin{runbox}[title={\textbf{System Prompt \emph{After} E-SPL}}]
+
+You are an expert research assistant. \quad $\cdots$
+\quad
+\textbf{\color{Brown}Workflow (follow \emph{exactly} in this order) \quad $\boldsymbol{\cdots}$}
+
+\medskip
+\textbf{3. Call the search tool once} --- Use \textbf{exactly} this syntax \quad $\cdots$
+
+\medskip
+\textbf{4. Verification block} --- For each result returned,
+\textbf{\textcolor{Brown}{output the following four lines in this order and nothing else}}:
+
+\smallskip
+\texttt{Source: <domain>} \\
+\texttt{Summary: <one-sentence summary>} \\
+\texttt{Status: VERIFIED (or NOT VERIFIED)} \\
+\texttt{Phrase: "<exact phrase>"} \ \ (only if Status is VERIFIED)
+
+\medskip
+\textbf{\textcolor{Brown}{A result is VERIFIED only if:}}
+
+\begin{itemize}
+  \item the exact target phrase appears verbatim in the snippet, \textbf{and}
+  \item the domain ends with \texttt{.org}, \texttt{.edu}, \texttt{.gov}, is Wikipedia,
+  \textbf{or} a major reputable outlet (e.g., \texttt{nytimes.com}, \texttt{bbc.com}, \texttt{reuters.com}, \texttt{theguardian.com})
+\end{itemize}
+
+If the domain is not on this list, mark the result \textbf{NOT VERIFIED} even if the phrase is present.
+
+\medskip
+\textbf{5. Refine query (optional)} ---
+\textbf{\textcolor{Brown}{If all results are NOT VERIFIED, modify the query and repeat Step 3.}}
+
+\medskip
+\textbf{Critical formatting rules (must be obeyed)}
+
+\begin{itemize}
+  \item All tool calls must be wrapped exactly as \texttt{<tool\_call>\{...\}</tool\_call>}
+  \item The only user-visible output after verification is the single \texttt{Answer:} line; {{no bullet points, markdown, blank lines, or extra text}}
+\end{itemize}
+
+\textbf{Positive example (correct flow)}
+
+\smallskip
+\texttt{User: "What other name is used for the 4 x 400 m relay?"} \\
+\texttt{Query: "4 x 400 metres relay"} \\
+\texttt{<tool\_call>\{"name": "search", "arguments": \{"query\_list": ["4 x 400 metres relay"]\}\}</tool\_call>} \\
+\texttt{Source: en.wikipedia.org} \\
+\texttt{Summary: The 4 x 400 metres relay is also known as the "long relay".} \\
+\texttt{Status: VERIFIED} \\
+\texttt{Phrase: "long relay"} \quad $\cdots$
+
+\medskip
+\textbf{\textcolor{Brown}{
+Follow exactly this loop for every user query.
+Your objective is to prove the answer with a verbatim phrase from a reliable source
+before you \emph{everr} write the final \texttt{Answer:} line.
+}}
+
+\end{runbox}
+\end{runcard}
+
+\end{figure}
+
+\subsection{Additional Examples of E-SPL Model Behavior}
+
+\begin{figure}[!tb]
+\centering
+\caption{\textbf{An example of how the RL model learns to utilize learned system prompts} (numbered G1 $\dots$ G30) \textbf{to solve problems.}}
+
+\begin{runcard}[title={Example of How E-SPL Shapes Model Behavior}]
+
+\medskip
+
+\begin{runbox}[title={\textbf{Learned System Prompt}}]
+When solving math problems, you MUST first carefully read and understand the helpful instructions and principles below:
+
+\textbf{\color{Brown}\hl{{[G1]}}. When optimizing sums, set parameters to cancel dominant terms. For quadratic forms, choose parameters that minimize the leading coefficients, reducing the problem to analyzing remainder terms.}
+
+$\cdots$
+
+\textbf{\color{Brown}\hl{{[G22]}}. In modular arithmetic and sums, decompose terms via remainders or moduli. Use periodicity for remainder sums and CRT for coprime factors, ensuring multiplicative solutions for square-free moduli.}
+
+$\cdots$
+\end{runbox}
+
+\begin{runbox}[title={Problem}]
+Let \(\mathbb{Z}/n\mathbb{Z}\) be the set of all integers modulo \(n\) (hence \(\mathbb{Z}/n\mathbb{Z}\) contains \(n\) elements). Find the second smallest composite number \(n\), such that there exists a bijective function \(g:\mathbb{Z}/n\mathbb{Z}\to \mathbb{Z}/n\mathbb{Z}\) such that the \(101\) functions
+\[ g(x),\ g(x)+x,\ g(x)+2x,\ \cdots,\ g(x)+100x \]
+are all bijective from \(\mathbb{Z}/n\mathbb{Z}\) to \(\mathbb{Z}/n\mathbb{Z}\).
+\end{runbox}
+
+\begin{runbox}[title={Model Output}]
+\textbf{Understanding the Condition:}
+Each function \(h_k(x) = g(x) + kx\) (for \(k=0,1,\ldots,100\)) must be a permutation of \(\mathbb{Z}/n\mathbb{Z}\). Since \(g\) is bijective, \(h_0(x)=g(x)\) is bijective by assumption. For \(k \geq 1\), \(h_k\) is bijective if and only if for every \(a \in \mathbb{Z}/n\mathbb{Z}\), the equation \(g(x) + kx = a\) has a unique solution \(x\).
+
+\textbf{Alternatively}, since \(g\) is a permutation, we can set \(y = g(x)\) and then \(x = g^{-1}(y)\), so
+$h_k(g^{-1}(y)) = y + k g^{-1}(y).$
+{But perhaps} a better approach is to consider the differences.
+\textbf{Note:}
+\(h_k\) is bijective if and only if the map \(x \mapsto g(x) + kx\) is injective. That is, if
+$g(x) + kx = g(y) + ky$
+then \(x = y\). Equivalently, $g(x) - g(y) = -k(x-y).$
+
+\textbf{Another idea}: Consider the composition \(h_k \circ g^{-1}\). Let \(f = g^{-1} \). Then \(h_k(g^{-1}(y)) = y + k f(y)\) $\cdots$
+
+$\dots$
+
+{\color{Brown}\textbf{Given the instructions, we should use \hl{[G22]}: In modular arithmetic, use CRT.}}
+
+If $n=$ product of primes, then by CRT, the condition holds if and only if it holds for each prime power factor.
+
+So for each $p^a$ dividing $n$, there exists a bijection $g_p$ on $Z/p^a$ such that the $101$ functions are bijective.
+
+For a prime $p > 101$, take $g(x)=x$ works. For $p <= 101$, we need to see if there is a bijection on $Z/p^a$.
+
+So the smallest composite would be one that has no prime factor $<=101$, i.e., all factors $>=103$. So the smallest is $103^2=10609$. But then the second smallest would be $103\times 107=11021$. \quad $\dots$
+
+\medskip
+\textbf{Final Answer:}
+\[
+\boxed{11021}
+\]
+
+\end{runbox}
+
+\textbf{Ground truth answer:} $11021$
+\end{runcard}
+\label{tab:example-e-spl-1}
+
+\end{figure}
+
+
+\begin{figure}[!tb]
+\centering
+\caption{\textbf{An example of how the RL model learns to utilize learned system prompts to solve problems.}}
+
+\begin{runcard}[title={Example of How E-SPL Shapes Model Behavior}]
+
+\medskip
+
+\begin{runbox}[title={\textbf{Learned System Prompt}}]
+When solving math problems, you MUST first carefully read and understand the helpful instructions and principles below:
+
+$\cdots$
+
+\textbf{\color{Brown}\hl{{[G26]}}. After deriving results, perform sanity checks: test small instances, ensure bounds, and verify extreme cases. Re-examine complex steps if results seem off.}
+
+$\cdots$
+\end{runbox}
+
+\begin{runbox}[title={Problem}]
+Real numbers \(x_1,x_2,\cdots,x_n\) satisfy
+\(|x_1|+|x_2|+\cdots+|x_{3526}| = 1\). Let \(M\) be the maximal possible value of
+\[
+\frac{1}{|x_1|+|x_1 - x_2|+|x_1 + x_2 - x_3|+\cdots+|x_1 + x_2+\cdots+x_{3525}-x_{3526}|}
+\]
+Find \(M\mod 1000\).
+
+\end{runbox}
+
+\begin{runbox}[title={Model Output}]
+
+\textbf{Let's analyze the problem step by step:} $\dots$
+
+The correct maximum is actually $2$, achieved by the first construction with all terms zero except the last.
+
+Therefore, $M = 2$. Then $M \mod 1000 = 2$.
+
+\textbf{So the answer is $\boldsymbol{2}$.} This is the simplest.
+
+\medskip
+{\color{Brown}\textbf{Given the instructions \hl{[G26]}: perform sanity checks.}}
+
+For $n=2$: $\cdots$ So for $n=2$, maximum is $2$.
+
+For $n=3$: $\cdots$ So for $n=3$, we can get $D=4$.
+
+In general, for $n$, the construction is: $x_1 = a$, $x_2 = a$, $x_3 = 2a$, $\dots$
+
+So denominator $= |a|$. Constraint: $|a| \cdot 2^{n-1} = 1$, so $|a| = 2^{1-n}$.
+
+Then $D = 2^{n-1}$.
+
+For $n=3526$, $D = 2^{3525}$. \textbf{This is huge, and integer.}
+
+So the maximum is $M = 2^{3525}$. Then $M \mod 1000 = 2^{3525} \mod 1000$. \quad $\cdots$ \quad So $2^{3525} \equiv 432 \pmod{1000}$.
+
+\textbf{So the answer is $\boldsymbol{432}$}. This is the intended solution.
+
+\medskip
+\textbf{Final Answer}:
+\[
+\boxed{432}
+\]
+
+\end{runbox}
+
+\textbf{Ground truth answer:} $432$
+\end{runcard}
+\label{tab:example-e-spl-2}
+
+\end{figure}
 
 \subsection{LLM-Based Self-Reflection for Mutation and Crossover}
 \label{sec:appendix-self-reflection}
