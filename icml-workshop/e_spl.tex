@@ -355,6 +355,51 @@ Figure \ref{fig:main-results} summarizes performance on math reasoning benchmark
 \end{itemize}
 \vspace{-5pt}
 
+\begin{figure*}[t]
+\centering
+\caption{\textbf{An example of how the RL model utilizes learned system prompts} (also see \autoref{tab:example-e-spl-4}).}
+\begin{runcard}[title={Example of How E-SPL Shapes Model Behavior}]
+
+\medskip
+
+\begin{runbox}[title={\textbf{Learned System Prompt}}]
+When solving math problems, you MUST first carefully read and understand the helpful instructions and principles below:
+
+$\cdots$ \quad \textbf{\color{Brown}\hl{{[G2]}}. For sums over integer pairs with conditions like $\boldsymbol{\gcd(a,b)=1}$, consider using Möbius inversion or changing the order of summation to simplify the expression.} \quad $\cdots$
+
+\end{runbox}
+
+\begin{runbox}[title={Problem}]
+Let $S$ be the set of all positive integers less than $143$ that are relatively prime to $143$. Compute the number of ordered triples $(a,b,c)$ of elements of $S$ such that $a+b=c$.
+
+\end{runbox}
+
+\begin{runbox}[title={Model Output}]
+
+\textbf{Let's solve the problem step by step:}
+
+\textbf{Step 1}: Factorize \( 143 = 11 \times 13 \). So, \( S \) consists of positive integers \( < 143 \) that are coprime to both $11$ and $13$.
+
+\quad $\cdots$
+
+\textbf{Step 5}: {\textbf{\color{Brown}Use Möbius inversion (Principle \hl{[G2]}).} Let \( f(n) \) be the number of pairs \( (a, b) \in S \times S \) with \( a + b = n \). We want \( \sum_{n=1}^{142} f(n) \cdot \mathbf{1}_{\gcd(n,143)=1} \). \quad $\cdots$}
+
+\quad $\cdots$
+
+\textbf{Step 11}: Apply inclusion-exclusion. \quad $\cdots$ \quad Therefore, the number of ordered triples $(a,b,c)$ is $5940$.
+
+\textbf{Final Answer}:
+\[
+\boxed{5940}
+\]
+
+\end{runbox}
+
+\textbf{Ground truth answer:} $5940$
+\end{runcard}
+\label{tab:example-e-spl-4-short}
+\end{figure*}
+
 \begin{figure}[h]
   \centering
   \includegraphics[width=0.38\textwidth]{figures/agentic_search.pdf}
@@ -424,54 +469,6 @@ Notably, the relative strength of RL versus evolution varies by domain --- RL do
 
 \vspace{-6pt}
 \paragraph{Failure Mode: Missing Caveats} Not all discovered heuristics are strictly correct — some over-generalize or miss caveats (\autoref{tab:corrected-principles}). However, unlike opaque RL weight updates, E-SPL's learned knowledge is explicit and editable, making it amenable to human monitoring, correction, and scalable oversight \citep{scalable-agent-alignment, scalable-oversight}.
-
-\vspace{-5pt}
-\begin{figure}[H]
-\centering
-\caption{\textbf{An example of how the RL model utilizes learned system prompts} (also see \autoref{tab:example-e-spl-4}).}
-\begin{minipage}{\columnwidth}
-\begin{runcard}[title={Example of How E-SPL Shapes Model Behavior}, width=\columnwidth]
-
-\medskip
-
-\begin{runbox}[title={\textbf{Learned System Prompt}}]
-When solving math problems, you MUST first carefully read and understand the helpful instructions and principles below:
-
-$\cdots$ \quad \textbf{\color{Brown}\hl{{[G2]}}. For sums over integer pairs with conditions like $\boldsymbol{\gcd(a,b)=1}$, consider using Möbius inversion or changing the order of summation to simplify the expression.} \quad $\cdots$
-
-\end{runbox}
-
-\begin{runbox}[title={Problem}]
-Let $S$ be the set of all positive integers less than $143$ that are relatively prime to $143$. Compute the number of ordered triples $(a,b,c)$ of elements of $S$ such that $a+b=c$.
-
-\end{runbox}
-
-\begin{runbox}[title={Model Output}]
-
-\textbf{Let's solve the problem step by step:}
-
-\textbf{Step 1}: Factorize \( 143 = 11 \times 13 \). So, \( S \) consists of positive integers \( < 143 \) that are coprime to both $11$ and $13$.
-
-\quad $\cdots$
-
-\textbf{Step 5}: {\textbf{\color{Brown}Use Möbius inversion (Principle \hl{[G2]}).} Let \( f(n) \) be the number of pairs \( (a, b) \in S \times S \) with \( a + b = n \). We want \( \sum_{n=1}^{142} f(n) \cdot \mathbf{1}_{\gcd(n,143)=1} \). \quad $\cdots$}
-
-\quad $\cdots$
-
-\textbf{Step 11}: Apply inclusion-exclusion. \quad $\cdots$ \quad Therefore, the number of ordered triples $(a,b,c)$ is $5940$.
-
-\textbf{Final Answer}:
-\[
-\boxed{5940}
-\]
-
-\end{runbox}
-
-\textbf{Ground truth answer:} $5940$
-\end{runcard}
-\end{minipage}
-\label{tab:example-e-spl-4-short}
-\end{figure}
 
 \subsection{Ablation Studies}
 
