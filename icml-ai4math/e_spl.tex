@@ -1,8 +1,8 @@
-%%%%%%%% ICML 2026 FoGen Workshop SUBMISSION FILE %%%%%%%%%%%%%%%%%
+%%%%%%%% ICML 2026 AI4Math Workshop SUBMISSION FILE %%%%%%%%%%%%%%%%%
 
 \documentclass{article}
 
-\usepackage{icml2026_fogen}
+\usepackage{icml2026}
 
 \usepackage{microtype}
 \usepackage{graphicx}
@@ -280,8 +280,8 @@ Our evolutionary algorithm (\textbf{EA}) optimizes the LLM system prompt to best
       \ENDWHILE
     \end{algorithmic}
   \end{algorithm}
+\vspace{-12pt}
 
-\vspace{-5pt}
 \paragraph{Fitness Evaluation}
 Our EA reuses RL rollout statistics directly, eliminating the held-out evaluation typical of prompt evolution methods. Since absolute returns are incomparable across iterations (different batches and weights), we treat each iteration as a \textbf{tournament}: within an iteration all prompts share the same batch and weights, so only their relative ordering matters. We rank prompts by $V_i$, compute $\mathbf{v} \leftarrow \mathrm{argsort}([V_{1},\dots, V_{M}])$, and update persistent TrueSkill \citep{trueskill} ratings $(\mu_i, \sigma_i)$ via Bayesian message passing (see \S\ref{sec:appendix-trueskill}).
 
@@ -357,7 +357,9 @@ Figure \ref{fig:main-results} summarizes performance on math reasoning benchmark
 
 \begin{figure*}[t]
 \centering
+\vspace{-6pt}
 \caption{\textbf{An example of how the RL model utilizes learned system prompts} (also see \autoref{tab:example-e-spl-4}).}
+\vspace{-6pt}
 \begin{runcard}[title={Example of How E-SPL Shapes Model Behavior}]
 
 \medskip
@@ -398,13 +400,17 @@ Let $S$ be the set of all positive integers less than $143$ that are relatively 
 \textbf{Ground truth answer:} $5940$
 \end{runcard}
 \label{tab:example-e-spl-4-short}
+\vspace{-12pt}
 \end{figure*}
 
 \begin{figure}[h]
+  \vspace{-8pt}
   \centering
   \includegraphics[width=0.38\textwidth]{figures/agentic_search.pdf}
+  \vspace{-6pt}
   \caption{{E-SPL outperforms both Evolution and RL on agentic search tasks with gpt-oss-120b.}}
   \label{fig:agentic-search}
+  \vspace{-15pt}
 \end{figure}
 
 Evolution-only consistently outperforms self-reflection, and can sometimes outperform RL-only. On both DAPO100 $\rightarrow$ AIME25 and AIME $\rightarrow$ BeyondAIME, evolution outperforms RL; on HMMT 23/24 $\rightarrow$ 25, GRPO slightly outperforms evolution. This is consistent with prior findings in GEPA \citep{gepa}.
@@ -451,7 +457,7 @@ For graphs with odd-degree vertices, find a minimum $T$-join by {\color{Midnight
 \vspace{0pt}
 \caption{
 The discovered system prompts sometimes include \textbf{heuristics that are {\color{Brown}not always true} but still helpful to problem-solving}. Unlike RL updates to model weights, the learned system prompts are interpretable and thus can be monitored and corrected. Here we showcase two subtle mistakes in two discovered principles, and what their {\color{MidnightBlue}\textbf{corrected}} versions should be (see \S\ref{app:mistake-made-by-principle} for explanations).}
-\vspace{-14pt}
+\vspace{-18pt}
 \label{tab:corrected-principles}
 \end{table*}
 
@@ -476,10 +482,12 @@ Notably, the relative strength of RL versus evolution varies by domain --- RL do
 Figure \ref{fig:evo-pol-ablation} shows that using a fixed reference policy $\pi_{\text{ref}}$ for self-reflection consistently outperforms using the continually changing RL policy $\pi_{\theta}$. A fixed reference provides a stable basis for mutation and crossover, whereas allowing the editor to drift alongside the policy introduces instability.
 
 \begin{figure}[t]
+  \vspace{-5pt}
   \centering
-  \includegraphics[width=0.38\textwidth]{figures/ablation_reflection_pol.pdf}
+  \includegraphics[width=0.32\textwidth]{figures/ablation_reflection_pol.pdf}
   \caption{{Using a fixed reference policy rather than the online RL policy for prompt evolution is important.}}
   \label{fig:evo-pol-ablation}
+  \vspace{-10pt}
 \end{figure}
 
 \vspace{-5pt}
@@ -497,7 +505,7 @@ We have shown that RL and evolutionary prompt search are deeply synergistic: E-S
 
 
 \bibliography{e_spl}
-\bibliographystyle{icml2026_fogen}
+\bibliographystyle{icml2026}
 
 \newpage
 \appendix
