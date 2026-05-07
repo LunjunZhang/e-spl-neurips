@@ -116,7 +116,7 @@
 \maketitle
 
 \begin{abstract}
-Building agentic systems that can autonomously self-improve from experience is a longstanding goal of AI. Large language models (LLMs) today primarily self-improve via two mechanisms: self-reflection for context updates, and reinforcement learning (RL) for weight updates. In this work, we propose \textbf{Evolutionary System Prompt Learning (E-SPL)}, a method for jointly improving model contexts and model weights. In each RL iteration, E-SPL samples trajectories under multiple system prompts in parallel, then jointly applies RL updates to weights and evolutionary updates to system prompts via LLM self-reflection. E-SPL encourages a natural division between declarative knowledge encoded in prompts and procedural knowledge encoded in weights. Most notably, in an easy-to-hard generalization setting (AIME $\rightarrow$ BeyondAIME), E-SPL improves RL success rate from $38.8\% \rightarrow 45.1\%$. E-SPL also improves RL on AIME 2025 ($56.3\% \rightarrow 60.6\%$), HMMT 2025 ($50.0\% \rightarrow 52.7\%$), and agentic search ($44.2\% \rightarrow 48.6\%$ on gpt-oss-120b). Across all settings, E-SPL outperforms both RL-only and evolution-only baselines, demonstrating that weight updates and context updates are deeply synergistic and can together yield gains in generalization neither achieves alone.
+Building agentic systems that can autonomously self-improve from experience is a longstanding goal of AI. Large language models (LLMs) today primarily self-improve via two mechanisms: self-reflection for context updates, and reinforcement learning (RL) for weight updates. In this work, we propose \textbf{Evolutionary System Prompt Learning (E-SPL)}, a method for jointly improving model contexts and model weights. In each RL iteration, E-SPL samples trajectories under multiple system prompts in parallel, then jointly applies RL updates to weights and evolutionary updates to system prompts via LLM self-reflection. E-SPL encourages a natural division between declarative knowledge encoded in prompts and procedural knowledge encoded in weights. Most notably, in an easy-to-hard generalization setting (AIME $\rightarrow$ BeyondAIME), E-SPL improves RL success rate from $38.8\% \rightarrow 45.1\%$. E-SPL also improves RL on AIME 2025 ($56.3\% \rightarrow 60.6\%$), HMMT 2025 ($50.0\% \rightarrow 52.7\%$), and agentic search ($44.2\% \rightarrow 48.6\%$ on gpt-oss-120b). Across all settings, E-SPL outperforms both RL-only and evolution-only baselines, demonstrating that weight updates and context updates are deeply synergistic and can together yield gains in generalization that neither achieves alone.
 \end{abstract}
 
 
@@ -465,7 +465,7 @@ Notably, the relative strength of RL versus evolution varies by domain --- RL do
 \paragraph{Codified Domain Expertise} E-SPL also codifies domain-specific heuristics — e.g., when to apply the Chinese Remainder Theorem or Möbius inversion (\autoref{fig:example-e-spl-1}, \autoref{fig:example-e-spl-4-short}). These declarative strategies let RL focus on honing core reasoning skills rather than memorizing domain knowledge.
 
 \vspace{-6pt}
-\paragraph{Failure Mode: Missing Caveats} Not all discovered heuristics are strictly correct — some over-generalize or miss caveats (\autoref{fig:corrected-principles}). However, unlike opaque RL weight updates, E-SPL's learned knowledge is explicit and editable, making it amenable to human monitoring, correction, and scalable oversight \citep{scalable-agent-alignment, scalable-oversight}.
+\paragraph{Failure Mode: Missing Caveats} Not all discovered heuristics are strictly correct; some over-generalize or miss caveats (\autoref{fig:corrected-principles}). However, unlike opaque RL weight updates, E-SPL's learned knowledge is explicit and editable, making it amenable to human monitoring, correction, and scalable oversight \citep{scalable-agent-alignment, scalable-oversight}.
 
 \vspace{-5pt}
 \subsection{Ablation Studies}
@@ -950,9 +950,9 @@ If $n=$ product of primes, then by CRT, the condition holds if and only if it ho
 
 So for each $p^a$ dividing $n$, there exists a bijection $g_p$ on $Z/p^a$ such that the $101$ functions are bijective.
 
-For a prime $p > 101$, take $g(x)=x$ works. For $p <= 101$, we need to see if there is a bijection on $Z/p^a$.
+For a prime $p > 101$, take $g(x)=x$ works. For $p \le 101$, we need to see if there is a bijection on $Z/p^a$.
 
-So the smallest composite would be one that has no prime factor $<=101$, i.e., all factors $>=103$. So the smallest is $103^2=10609$. But then the second smallest would be $103\times 107=11021$. \quad $\dots$
+So the smallest composite would be one that has no prime factor $\le 101$, i.e., all factors $\ge 103$. So the smallest is $103^2=10609$. But then the second smallest would be $103\times 107=11021$. \quad $\dots$
 
 \medskip
 \textbf{Final Answer:}
