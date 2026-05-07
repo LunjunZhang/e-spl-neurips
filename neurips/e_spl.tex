@@ -253,6 +253,8 @@ When using low-rank adaptation \citep{lora}, the KL term is implicit and often i
 
 \vspace{-5pt}
 \subsection{Evolutionary Algorithm for Context Update}
+Integrating evolutionary search with online RL poses two challenges: prior genetic operators assume a stationary fitness landscape, whereas RL shifts model weights every iteration; and they require separate evaluation on held-out data, whereas RL generates rollouts on-policy. E-SPL addresses both by reusing RL rollouts for fitness evaluation and employing TrueSkill ratings to aggregate relative rankings across non-stationary iterations.
+
 Our evolutionary algorithm (\textbf{EA}) optimizes the LLM system prompt to best elicit model capabilities and encode explicit knowledge learned from experience. Like in classical EA, we keep a population of candidates, and: (1) \textbf{evaluate the fitness} of different system prompts continuously during training; (2) \textbf{select} the successful ones from the population; (3) \textbf{reproduce} new system prompts from selected parents to add to the population via mutation and crossover -- both grounded in LLM self-reflection but differing in their context construction strategies. The population $\mathcal{S}$ starts with a single {root}, and gradually grows into an evolutionary tree.
 
 \begin{wrapfigure}{r}{0.59\textwidth}
@@ -332,30 +334,30 @@ Our EA reuses RL rollout statistics directly, eliminating the held-out evaluatio
   \caption{\centering
   Results on mathematical reasoning datasets using DeepSeek-v3.1. \textbf{Evolution + RL} (our E-SPL method) performs best compared to self-reflection (prompting only), evolution (prompting only), and RL (weight update only). The results show that coupling RL with evolution on system prompts unlocks a synergistic form of self-improvement that neither approach achieves in isolation.}
   \label{fig:main-results}
-  \vspace{-2pt}
+  \vspace{-15pt}
 \end{figure}
 
 
 
-We evaluate E-SPL on mathematical reasoning and agentic search benchmarks, with the goal of answering the following questions: \textbf{(1)} Does jointly evolving system prompts and model weights outperform optimizing either alone? \textbf{(2)} How does E-SPL affect the learning speed and generalization of RL? \textbf{(3)} What are some emergent patterns in the system prompts discovered via E-SPL? \textbf{(4)} What roles do mutation and crossover play in the evolutionary dynamics of E-SPL?
+We evaluate E-SPL on mathematical reasoning and agentic search benchmarks, asking: \textbf{(1)} Does jointly evolving system prompts and model weights outperform optimizing either alone? \textbf{(2)} How does E-SPL affect the learning speed and generalization of RL? \textbf{(3)} What emergent patterns arise in discovered system prompts?
 
 \vspace{-5pt}
 \subsection{Experimental Setup}
 
 \paragraph{Tasks and datasets.}
-We first focus on mathematical reasoning tasks with limited data, a regime in which inductive biases from evolved system prompts are expected to play a particularly important role. Our main evaluations include: \textbf{(1) DAPO100$\rightarrow$AIME25}, which follows the protocols from \citep{train-free-grpo} that trains on $100$ selected problems from the DAPO dataset \citep{dapo} and tests on AIME 2025 competition; \textbf{(2) HMMT 23/24$\rightarrow$25}, which uses all of HMMT 2023, 2024, and February 2025 problems as training set, and November 2025 problems as test set; \textbf{(3) AIME$\rightarrow$BeyondAIME}, which uses past years of AIME (AIME 22, AIME 23, and AIME 24) as the training set, and BeyondAIME \citep{beyondaime} as test set, which is a collection of original problems with difficulty levels greater than or equal to that of the hardest AIME problems each year. In addition, we also evaluate on \textbf{(4) Agentic Search} on Natural Questions (NQ) \citep{nq} and HotpotQA \citep{hotpotqa}, where we subsample 196 problems for training and 64 problems for test; the task is to teach an LLM model to use search engines to answer complex multi-hop questions \citep{search-r1}.
+Our main evaluations include: \textbf{(1) DAPO100$\rightarrow$AIME25}, which follows the protocols from \citep{train-free-grpo} that trains on $100$ selected problems from the DAPO dataset \citep{dapo} and tests on AIME 2025 competition; \textbf{(2) HMMT 23/24$\rightarrow$25}, which uses all of HMMT 2023, 2024, and February 2025 problems as training set, and November 2025 problems as test set; \textbf{(3) AIME$\rightarrow$BeyondAIME}, which uses past years of AIME (AIME 22, AIME 23, and AIME 24) as the training set, and BeyondAIME \citep{beyondaime} as test set, a set of problems at or above AIME difficulty. In addition, we also evaluate on \textbf{(4) Agentic Search} on Natural Questions (NQ) \citep{nq} and HotpotQA \citep{hotpotqa}, where we subsample 196 problems for training and 64 problems for test; the task is multi-hop question answering with search engine API calls within the chain-of-thoughts \citep{search-r1}.
 
 \vspace{-6pt}
-\paragraph{Models} On math tasks, we use the base model DeepSeek v3.1 \citep{deepseekv3} for our experiments, which is a 671B MoE \citep{moe} model with 37B active parameters. On agentic search tasks, we use OpenAI's gpt-oss-120b \citep{openai-gpt-oss}, which is a 120B MoE model with 5B active parameters. All finetuning is done via low-rank adaptation \citep{lora} with a rank of $32$.
+\paragraph{Models} On math tasks, we use DeepSeek v3.1 \citep{deepseekv3}, a 671B MoE \citep{moe} model with 37B active parameters. On agentic search tasks, we use OpenAI's gpt-oss-120b \citep{openai-gpt-oss}, which is a 120B MoE model with 5B active parameters. All finetuning is done via low-rank adaptation \citep{lora} with a rank of $32$.
 
 \vspace{-6pt}
 \paragraph{Methods compared} We compare the following variants:
 \vspace{-6pt}
 \begin{itemize}
     \item \textbf{RL only}: standard RL post-training with a fixed system prompt; we benchmark the popular \textbf{GRPO} \citep{grpo} and \textbf{CISPO} \citep{cispo} algorithms;
-    \item \textbf{Self-reflection}: iterative prompt refinement via reflection \citep{reflexion, train-free-grpo, reasoningbank}, without weight updates. This is essentially our mutation operator on its own, with frozen weights, no crossover operator, and a population size of $1$.
-    \item \textbf{Evolution}: which runs our evolutionary algorithm (EA) for system prompt search with frozen model weights. Our evolutionary algorithm is very similar to GEPA \citep{gepa} except that we do not continuously run evaluation on a separate feedback set, and instead only use train-time rollout statistics just like in standard RL. Like GEPA, our EA works well on its own, and can sometimes outperforms RL.
-    \item \textbf{Evolution + RL (E-SPL)}: our full method, jointly evolving model contexts and updating model weights.
+    \item \textbf{Self-reflection}: iterative prompt refinement via reflection \citep{reflexion, train-free-grpo, reasoningbank}, without weight updates. Equivalent to mutation-only with frozen weights and population size 1.
+    \item \textbf{Evolution}: which runs our evolutionary algorithm (EA) for system prompt search with frozen model weights. Our EA is similar to GEPA \citep{gepa} but uses only train-time rollout statistics rather than a separate feedback set.
+    \item \textbf{Evolution + RL (E-SPL)}: our full method, jointly evolving contexts and updating weights.
 \end{itemize}
 
 
@@ -365,18 +367,9 @@ We first focus on mathematical reasoning tasks with limited data, a regime in wh
   \vspace{2pt}
   \caption{\textbf{E-SPL learns faster, and achieves better asymptotic performance that neither RL nor prompt evolution alone could achieve.} By studying the learned system prompts (e.g. \autoref{tab:examples-principles} and \autoref{tab:example-e-spl-1}), we hypothesize that E-SPL achieves this by encouraging a natural division between declarative knowledge (factual information or global heuristics that can be verbally explained) in prompts and procedural knowledge (practical, instinctive ``know-how" that relies on intuition developed through repetition) in weights.}
   \label{fig:learning-progress}
-  \vspace{0pt}
+  \vspace{-15pt}
 \end{figure}
 
-
-\begin{wrapfigure}{r}{0.4\textwidth}
-  \vspace{-12pt}
-  \centering
-  \includegraphics[width=0.38\textwidth]{figures/agentic_search.pdf}
-  \caption{{E-SPL outperforms both Evolution and RL on agentic search tasks with gpt-oss-120b.}}
-  \label{fig:agentic-search}
-  \vspace{-12pt}
-\end{wrapfigure}
 
 \vspace{-8pt}
 \subsection{Main Results}
@@ -384,25 +377,36 @@ We first focus on mathematical reasoning tasks with limited data, a regime in wh
 Figure \ref{fig:main-results} summarizes performance on math reasoning benchmarks using DeepSeek-v3.1 model. Figure \ref{fig:agentic-search} summarizes our results on agentic search tasks using OpenAI gpt-oss-120b. Across all datasets, \textbf{Evolution + RL} (E-SPL) consistently outperforms baselines that optimize either prompts (evolution-only) or weights (RL-only) in isolation.
 \vspace{-5pt}
 \begin{itemize}
-    \item On \textbf{AIME 2025}, E-SPL improves success rate from ${56.3\% \rightarrow 60.6\%}$ compared to the RL-only (GRPO).
-    \item On \textbf{HMMT 2025}, performance improves from ${50.0\% \rightarrow 52.7\%}$ after applying E-SPL to RL.
-    \item On an easy-to-hard generalization \citep{easy-to-hard} setting, \textbf{AIME $\rightarrow$ BeyondAIME}, the gains are the most pronounced, where E-SPL improves RL from ${38.8\%\rightarrow45.1\%}$ in success rate.
-    \item On \textbf{agentic search} tasks, E-SPL improves RL from $44.2\% \rightarrow 48.6\%$, which demonstrates that E-SPL is not limited to mathematical reasoning, but is also effective in agentic reasoning with tool use.
-    \item On all tasks above, E-SPL outperforms evolution-only as well, with the relative improvements ranging from $+5.8\%$ to $+12.8\%$ on the mathematical reasoning tasks, and $+42.9\%$ on the agentic search task.
+    \item On \textbf{AIME 2025}, E-SPL improves success rate from ${56.3\% \rightarrow 60.6\%}$ over RL-only.
+    \item On \textbf{HMMT 2025}, performance improves from ${50.0\% \rightarrow 52.7\%}$ after applying E-SPL.
+    \item On an easy-to-hard generalization \citep{easy-to-hard} setting, \textbf{AIME $\rightarrow$ BeyondAIME}, the gains are most pronounced, where E-SPL improves RL from ${38.8\%\rightarrow45.1\%}$ in success rate, capable of learning more generalizable strategies from easier training problems.
+    \item On \textbf{agentic search} tasks, E-SPL improves RL from $44.2\% \rightarrow 48.6\%$, which demonstrates that E-SPL is not limited to mathematical reasoning, but is also effective in agentic reasoning with tool use, where evolved prompts discover novel workflows (\autoref{tab:prompt-evolution-search}).
+    \item On all tasks above, E-SPL outperforms evolution-only as well, with relative improvements over evolution-only ranging from $+5.8\%$ to $+12.8\%$ on math reasoning tasks, and $+42.9\%$ on the agentic search task.
 \end{itemize}
 \vspace{-5pt}
-Evolution-only consistently outperforms self-reflection, and can sometimes outperform RL-only. On both DAPO100 $\rightarrow$ AIME25 and AIME $\rightarrow$ BeyondAIME, evolution outperforms RL; on HMMT 23/24 $\rightarrow$ 25, GRPO slightly outperforms evolution. This finding is consistent with prior findings in GEPA \citep{gepa}, and validates the design of our proposed evolutionary algorithm on its own.
+
+\begin{wrapfigure}{r}{0.4\textwidth}
+  \vspace{-20pt}
+  \centering
+  \includegraphics[width=0.38\textwidth]{figures/agentic_search.pdf}
+  \vspace{-8pt}
+  \caption{{E-SPL outperforms both Evolution and RL on agentic search tasks with gpt-oss-120b.}}
+  \label{fig:agentic-search}
+  \vspace{-12pt}
+\end{wrapfigure}
+
+Evolution-only consistently outperforms self-reflection, and can sometimes outperform RL-only. On both DAPO100 $\rightarrow$ AIME25 and AIME $\rightarrow$ BeyondAIME, evolution outperforms RL; on HMMT 23/24 $\rightarrow$ 25, GRPO slightly outperforms evolution. This is consistent with prior findings in GEPA \citep{gepa}.
 
 
 \begin{table*}[t]
 \centering
 \small
-\vspace{4pt}
+\vspace{-4pt}
 \setlength{\tabcolsep}{3.5pt}
 \renewcommand{\arraystretch}{1.0}
 \begin{tabular}{%
-  p{0.09\textwidth}|
-  >{\raggedright\arraybackslash\renewcommand{\baselinestretch}{1.15}\selectfont}p{0.88\textwidth}
+  p{0.12\textwidth}|
+  >{\raggedright\arraybackslash\renewcommand{\baselinestretch}{1.15}\selectfont}p{0.85\textwidth}
 }
 
 \toprule
@@ -433,59 +437,45 @@ For graphs with odd-degree vertices, find a minimum $T$-join by {\color{Midnight
 \\
 \bottomrule
 \end{tabular}
-\vspace{3pt}
+\vspace{0pt}
 \caption{
 The discovered system prompts sometimes include \textbf{heuristics that are {\color{Brown}not always true} but still helpful to problem-solving}. Unlike RL updates to model weights, the learned system prompts are interpretable and thus can be monitored and corrected. Here we showcase two subtle mistakes in two discovered principles, and what their {\color{MidnightBlue}\textbf{corrected}} versions should be (see \S\ref{app:mistake-made-by-principle} for explanations).}
-\vspace{-14pt}
+\vspace{-8pt}
 \label{tab:corrected-principles}
 \end{table*}
 
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.95\textwidth]{figures/evo-tree-4-v2.pdf}
+  \vspace{-2pt}
+  \caption{\textbf{TrueSkill scores learned from train-time rankings are predictive of relative test-time performance of system prompts.} E-SPL treats each RL iteration as a set of relative comparisons between system prompts for TrueSkill message passing. The visualization shows that E-SPL effectively aggregates noisy train-time comparisons into a stable and informative criterion for evolutionary selection.}
+  \label{fig:evo-tree-1}
+  \vspace{-10pt}
+\end{figure}
 
+Figure \ref{fig:learning-progress} shows that evolution-only learns fastest early on but plateaus, while E-SPL achieves both faster learning and higher asymptotic performance.
 
-Figure \ref{fig:learning-progress} visualizes the learning curves across three mathematical reasoning settings. E-SPL demonstrates better sample efficiency and higher asymptotic performance compared to both RL-only and evolution-only baselines. Evolution-only often learns the fastest early on since it only has to update model contexts, but obtains lower asymptotic performance because it does not update model weights and therefore struggles with improving procedural knowledge.
-
-In agentic search, we find that RL can significantly outperform prompt evolution ($44.2\%$ versus $34.0\%$); whereas in math reasoning, RL often performs on-par with evolution (Figure \ref{fig:main-results}). It can often be hard to predict \textit{a priori} whether RL or prompt evolution will perform better on a particular domain, since the learning bottleneck could be an arbitrary mix of declarative and procedural knowledge. E-SPL naturally combines the strengths of both, allowing continual self-improvement to proceed along whichever axis of knowledge is most limiting for the task at hand.
-
-Overall, the results above suggest that evolving system prompts and applying RL to weights play complementary roles in LLM self-improvement. System prompts progressively accumulates explicit, declarative knowledge -- such as high-level principles, robust workflows, corner cases, and failure modes (see \autoref{tab:examples-principles} and \autoref{tab:prompt-evolution-search}) -- while RL updates the weights to acquire procedural knowledge that is tacit and intuitive. By conditioning RL on increasingly informative system prompts, E-SPL allows weight updates to focus on intuitive skills, leading to better sample efficiency.
+Notably, the relative strength of RL versus evolution varies by domain --- RL dominates in agentic search ($44.2\%$ vs $34.0\%$) but is on-par with evolution in math reasoning. E-SPL combines the strengths of both regardless of domain.
 
 \vspace{-5pt}
 \subsection{Emergent Patterns in Learned System Prompts}
 
-We observe several recurring patterns that emerge in the learned system prompts, which we discuss below.
-
-\vspace{-10pt}
-\paragraph{Generative Self-Verification} We find that a repeated theme in learned system prompts is about learning to self-verify a solution in a generative manner \citep{gen-verifier}.
-
-For instance, in the agentic search setting, the learned system prompt (\autoref{tab:prompt-evolution-search}) defines a workflow that explicitly labels each search result as VERIFIED versus NOT VERIFIED based on two criteria: whether the target phrase appears verbatim in the snippet returned by search engine, and whether the domain name ends with \texttt{.org}, \texttt{.edu}, \texttt{.gov}, is a major reputable news outlet or Wikipedia. It goes on to specify that if all results have NOT VERIFIED status, then the model should repeat the search and continue the loop in its chain of thought. The learned system prompt defines the objective as \emph{`to prove the answer with a verbatim phrase from a reliable source before you everr write the final \texttt{Answer:} line'}. \textbf{The RL process, in turn, does not need to discover new workflows from scratch and encode them in weights, but rather refines and perfects the execution of the workflows specified in the discovered system prompts.} Such workflows emerge through E-SPL and are absent from the initial system prompt.
-
-In solving math problems, a similar self-verification strategy emerged. In \autoref{tab:example-e-spl-2}, the learned system prompt has discovered the following instruction: \emph{`After deriving results, perform sanity checks: test small instances, ensure bounds, and verify extreme cases. Re-examine complex steps if results seem off.'} The full example in \autoref{tab:example-e-spl-2} illustrates how the RL model has learned to use this particular self-verification strategy to solve a particular problem on BeyondAIME test set: after initially concluding that \emph{`So the answer is $2$'}, the model explicitly cites this strategy from the system prompt, and follows the exact instruction to perform sanity checks by starting from small instances of $n=2$ and $n=3$, before moving on to the general case and saying \emph{`Wait, careful'} when it identified its own mistake. The model then self-corrects and concludes with \emph{`So the answer is 432. This is the intended solution'}, which is correct. This example explains E-SPL's effectiveness: high-level strategies are specified by the system prompt, while RL fine-tunes execution. Self-rewrite of the system prompt induces more systematic behavior changes than weight updates alone.
+\paragraph{Generative Self-Verification} A recurring theme is generative self-verification \citep{gen-verifier}. In agentic search, the learned system prompt (\autoref{tab:prompt-evolution-search}) specifies a workflow that labels each search result as VERIFIED or NOT VERIFIED based on source reliability and verbatim phrase matching, looping until verification succeeds. In math, a similar strategy emerged: \emph{`perform sanity checks: test small instances, ensure bounds, and verify extreme cases'} (\autoref{tab:example-e-spl-2}). RL then refines execution of these workflows rather than discovering them from scratch.
 
 \vspace{-6pt}
-\paragraph{Codified Domain Expertise and Heuristics} The learned system prompts also have many strategies that are highly domain-specific. For instance, \autoref{tab:example-e-spl-1} showcases learned system prompts such as \emph{`When optimizing sums, set parameters to cancel dominant terms. For quadratic forms, \dots'} (which is specific to problems that optimize sums) and \emph{`In modular arithmetic and sums, decompose terms via remainders or moduli. Use periodicity for remainder sums and CRT for coprime factors, ensuring multiplicative solutions for square-free moduli.'} (which points out the importance of Chinese Remainder Theorem, or \textit{CRT} for short, in solving modular arithmetic). Example \ref{tab:example-e-spl-1} shows that the RL model persistently explores many potential directions, repeating phrases like \emph{`Alternatively'}, \emph{`Another idea'}, \emph{`But let's think'}, before simplifying the problem to a form of modular arithmetic and recognizing that it should apply \textit{CRT} in that situation according to the system prompt. Example \ref{tab:example-e-spl-4-short} shows that the RL model cited a helpful heuristic in the system prompt suggesting the use of Möbius inversion under specific conditions, which became a crucial step in the solution. Those examples demonstrate that \textbf{E-SPL can effectively codify declarative knowledge into the system prompt -- specialized domain expertise and helpful problem-solving heuristics under various circumstances -- so that RL can focus on honing core reasoning skills} rather than memorizing domain knowledge.
-
-
+\paragraph{Codified Domain Expertise} E-SPL also codifies domain-specific heuristics — e.g., when to apply the Chinese Remainder Theorem or Möbius inversion (\autoref{tab:example-e-spl-1}, \autoref{tab:example-e-spl-4-short}). These declarative strategies let RL focus on honing core reasoning skills rather than memorizing domain knowledge.
 
 \vspace{-6pt}
-\paragraph{Failure Mode: Missing Caveats} Not all discovered strategies from E-SPL can hold true in the most general cases. In \autoref{tab:corrected-principles}, we study two cases where the learned system prompt included heuristics that are not strictly true in general but are still helpful in limited scenarios. For instance, in analyzing polynomials of a particular form, the discovered strategy misunderstood the lower bound of a min as the actual min. In the other case, the discovered principle for graph theory vaguely outlined an algorithm for finding a minimum $T$-join by \emph{`pairing odd vertices along efficient paths'}; the actual optimal solution requires \emph{pairing odd vertices via a minimum-weight perfect matching on shortest-path distances}. The likely reason for those mistakes is that E-SPL over-generalized some particular training data points or made mistakes in its self-reflection process. E-SPL is still missing caveats in many of its generalized principles. 
-
-However, we argue that such mistakes in acquired knowledge are more transparent and interpretable than RL gradient updates, because they can be more easily monitored and edited by humans. A model trained by RL alone will also pick up on certain assumptions that are only partially correct, but even the best mechanistic interpretability tools today \citep{scaling-sae, transcoders, feature-circuit} still cannot interpret those weight updates or edit the behaviors in a straightforward manner. By comparison, E-SPL represents a part of learned knowledge as explicit, propositional statements, which are much more suited for further verification, formalization \citep{alphageometry, alphaproof}, and scalable oversight \citep{scalable-agent-alignment, scalable-oversight, llm-critic-help-catch-llm-bug}.
+\paragraph{Failure Mode: Missing Caveats} Not all discovered heuristics are strictly correct — some over-generalize or miss caveats (\autoref{tab:corrected-principles}). However, unlike opaque RL weight updates, E-SPL's learned knowledge is explicit and editable, making it amenable to human monitoring, correction, and scalable oversight \citep{scalable-agent-alignment, scalable-oversight}.
 
 \vspace{-5pt}
 \subsection{Ablation Studies}
 
-\paragraph{Effect of Crossover} \autoref{fig:crossover-ablation} analyzes the contribution of genetic operators. Adding \textbf{crossover} to mutation accelerates early learning, consistent with its role in propagating high-fitness substructures across evolutionary branches. However, its effect on final performance is mixed: on AIME $\rightarrow$ BeyondAIME, mutation-only achieves higher final accuracy, while on HMMT, mutation $+$ crossover performs slightly better. \textbf{Both variants outperform RL-only}, confirming the value of evolutionary search over system prompts regardless of genetic operator choice.
-
-\autoref{fig:evo-tree-2} visualizes evolutionary trees produced during training. As shown, the crossover operator enables knowledge transfer across different branches of the evolutionary tree, but at the cost of reduced \emph{speciation} -- long-term separation between evolutionary lineages. To better understand the tradeoffs of using crossover, we draw attention to prior work \citep{ga-in-search, eshelman1991preventing, mahfoud1995niching, vose1999-simple-ga} that supports our observations:
-\vspace{-8pt}
-\begin{itemize}
-    \item crossover can accelerate short-term progress by mixing useful substructures,
-    \item but it can also wash out subpopulation structure, reduce long-run diversity, and increase the risk of premature homogenization and convergence.
-\end{itemize}
-\vspace{-8pt}
-Mutation-only behaves more like independent local hill-climbs along separate lineages. Lineages stay separated longer, so we can keep parallel hypotheses alive \citep{holland1992adaptation}. Mutation + Crossover accelerates early progress by re-combining partial improvements, but the population may rapidly converge around a locally high-performing system prompt, limiting exploration of qualitatively and structurally distinct high-quality solutions \citep{spears1993crossover}. Classically, this tradeoff can be significantly improved by a class of techniques called \emph{niching}, which include fitness sharing \citep{genetic-algorithm}, mating restriction \citep{investigation-of-species-formation}, and the island model \citep{island-model}. We leave the application of niching to E-SPL for future work.
+\paragraph{Sampling Policy for Evolution}
+Figure \ref{fig:evo-pol-ablation} shows that using a fixed reference policy $\pi_{\text{ref}}$ for self-reflection consistently outperforms using the continually changing RL policy $\pi_{\theta}$. A fixed reference provides a stable basis for mutation and crossover, whereas allowing the editor to drift alongside the policy introduces instability.
 
 \begin{wrapfigure}{r}{0.4\textwidth}
-  \vspace{-12pt}
+  \vspace{-20pt}
   \centering
   \includegraphics[width=0.38\textwidth]{figures/ablation_reflection_pol.pdf}
   \caption{{Using a fixed reference policy rather than the online RL policy for prompt evolution is important.}}
@@ -494,15 +484,17 @@ Mutation-only behaves more like independent local hill-climbs along separate lin
 \end{wrapfigure}
 
 \vspace{-5pt}
-\paragraph{Sampling Policy for Evolution}
-Figure \ref{fig:evo-pol-ablation} evaluates the effect of using a fixed reference policy $\pi_{\text{ref}}$ for system prompt evolution, rather than the continually changing RL policy $\pi_{\theta}$. Using the fixed reference policy $\pi_{\text{ref}}$ for evolutionary updates consistently improves the final performance of E-SPL. This supports our design choice to keep evolutionary operators stationary: allowing the editor itself to drift alongside the policy introduces instability and degrades the quality of system prompt edits. A fixed reference policy provides a stable basis for self-reflection, mutation, and crossover.
+\paragraph{Effect of Crossover} Adding crossover to mutation accelerates early learning by propagating useful substructures across lineages, with comparable final performance (\autoref{fig:crossover-ablation}). Both mutation-only and mutation+crossover consistently outperform RL-only, confirming that E-SPL's gains are attributable to evolutionary search over system prompts as a whole, rather than any specific operator.
+
+\vspace{-5pt}
+\paragraph{Hyperparameter Sensitivity} TrueSkill is used off-the-shelf with default parameters (see \S\ref{sec:appendix-trueskill}). The remaining hyperparameters (see \S\ref{sec:appendix-hyperparameters}) are either standard RL hyperparameters or EA hyperparameters shared identically with baselines, so E-SPL introduces no additional tuning burden beyond the baselines of RL and EA.
 
 
 \begin{figure}[!tb]
 \centering
 \vspace{-2pt}
-\caption{\textbf{An example of how the RL model learns to utilize learned system prompts to solve problems} (also see \autoref{tab:example-e-spl-4}).}
-
+\caption{\textbf{An example of how the RL model utilizes learned system prompts} (also see \autoref{tab:example-e-spl-4}).}
+\vspace{-8pt}
 \begin{runcard}[title={Example of How E-SPL Shapes Model Behavior}]
 
 \medskip
@@ -544,12 +536,12 @@ Let $S$ be the set of all positive integers less than $143$ that are relatively 
 \end{runcard}
 \label{tab:example-e-spl-4-short}
 
-\vspace{-6pt}
+\vspace{-18pt}
 \end{figure}
 
 
 \section{Conclusion}
-We have shown that unifying RL and evolutionary prompt search significantly enhances LLM self-improvement. E-SPL demonstrates that RL and Evolution are not competing paradigms but deeply synergistic ones. On a variety of reasoning and agentic tasks, our unified approach leads to better sample efficiency, asymptotic performance, and generalization. While the current method is not yet fully self-referential, it takes a meaningful step in that direction by allowing the model to self-modify its own system-level instructions. We believe further unification of Evolution and RL for self-rewrite can pave the way toward Seed AI.
+We have shown that RL and evolutionary prompt search are deeply synergistic: E-SPL jointly optimizes model weights and system prompts, yielding consistent gains in sample efficiency, asymptotic performance, and generalization across reasoning and agentic tasks. A key insight is that system prompts provide a natural substrate for declarative knowledge that complements the procedural knowledge acquired through RL, and that the two forms of self-improvement reinforce each other. We hope E-SPL motivates further work on unifying evolutionary self-rewrite with gradient-based learning for increasingly autonomous self-improving agents.
 
 \begin{ack}
 \end{ack}
@@ -568,18 +560,239 @@ We have shown that unifying RL and evolutionary prompt search significantly enha
 \appendix
 \section{Appendix Contents}
 
-\subsection{Additional Figures}
+\subsection{LLM-Based Self-Reflection for Mutation and Crossover}
+\label{sec:appendix-self-reflection}
+
+E-SPL implements both mutation and crossover as LLM-driven editing operators over past system prompts. The mutation operator consists of (i) a self-reflection stage that diagnoses performance from RL rollouts (which has two steps: trajectory summarization and self-critique), followed by (ii) a patch synthesis stage that applies structured edits to the parent prompt using a git-style diff (which has two steps: local edit proposals and local-to-global aggregation). On the other hand, the crossover operator has a single stage (Alg.~\ref{alg:crossover}).
+
+\paragraph{Mutation is Multi-Stage.}
+In each RL iteration of Alg.~\ref{alg:e-spl}, we identify the best-performing system prompt
+\begin{align}
+k \leftarrow \arg\max_i V_i, \qquad V_i = \frac{1}{N}\sum_{j=1}^N R(x,y_{i,j}),
+\end{align}
+where the returns are computed under matched conditions for all sampled prompts.
+
+\paragraph{Self-Reflection Module in Mutation} Let $\mathcal{E}_k = \{(x,y_{k,j},r_{k,j})\}_{j=1}^N$ denote the rollouts produced under $\mathbf{s}_k$. 
+The self-reflection prompt $\Psi_{\text{reflect}}$ instructs the reference model $\pi_{\text{ref}}$ to summarize these trajectories (\textbf{Trajectory Summarization}, \S\ref{sec:appendix-trajectory-summary}), attribute successes and failures to specific reasoning behaviors (\textbf{Self-Critique}, \S\ref{sec:appendix-local-critique}), and produce lessons $\ell$:
+\begin{align}
+\ell \sim \pi_{\text{ref}}(\cdot \mid \Psi_{\text{reflect}}, \mathcal{E}_k).
+\end{align}
+\paragraph{Local Edit Proposal (\S\ref{sec:appendix-max-ops})}
+Given the reflection output $\ell$, we generate concrete edits to the parent system prompt:
+\begin{align}
+\mathrm{diff} \sim \pi_{\text{ref}}(\cdot \mid \mathbf{s}_k, \ell)
+\end{align}
+for each problem $x$ in the batch $\mathcal{B}$. Each $\mathrm{diff}$ is a list of local edits. Now we need a mechanism to aggregate those individual per-problem edits across a batch of problems.
+
+\paragraph{Local-to-Global Aggregation (\S\ref{sec:appendix-global-revision})}
+To reconcile overlapping edits to the system prompt proposed by parallel self-reflection processes, E-SPL aggregates these edits using a consolidation prompt that produces a global revision plan consisting of:
+\begin{itemize}
+    \item \textbf{modify}: refine an existing principle using accumulated evidence,
+    \item \textbf{merge}: combine semantically similar principles into a more general form.
+\end{itemize}
+Each resulting principle in the system prompt should be short, abstract, and strategy-focused, preventing uncontrolled growth of the system prompt length. We then apply the global editing operations:
+\begin{align}
+    \mathbf{s}_{\text{mutate}} \leftarrow \mathrm{git.apply}(\mathbf{s}_k, \mathrm{diff})
+\end{align}
+The resulting child system prompt is added to the population with inherited rating and increased uncertainty as in Alg.~\ref{alg:e-spl}. The diff format is especially important as system prompts grow longer.
+
+
+\begin{algorithm}[H]
+\caption{$\mathrm{Crossover}(\mathcal{B}, R, \Omega, \pi_{\theta}, \pi_{\text{ref}} )$}
+    \label{alg:crossover}
+    \begin{algorithmic}
+        \STATE {\bfseries Input:} List of $B$ problems: $\mathcal{B}$; reward function $R(\cdot, \cdot)$.
+        \STATE {\bfseries Input:} List of $M$ system prompts: $\Omega$.
+        \STATE {\bfseries Input:} RL policy $\pi_{\theta}(\cdot)$, reference policy $\pi_{\text{ref}}(\cdot)$.
+        \vspace{5pt}
+
+        \STATE Let $\Phi \in \mathbb{R}^{M \times B}$ \hfill \COMMENT{{\color{Brown}$\Phi_{i,b}$ is the empirical return of the $i$-th system prompt in $\Omega$ on the $b$-th problem in $\mathcal{B}$}}
+        \FOR{$(\mathbf{s}_{i}, \mu_i, \sigma_i)$ $\textbf{in}$ $\Omega$}
+            \FOR{$x_{b}$ $\textbf{in}$ $\mathcal{B}$}
+                \STATE Sample $\{y_{i, b, j}\}_{j=1}^{N}$ from $\pi_{\theta}$: $y_{i, b, j}\sim \pi_{\theta}(\cdot \mid \mathbf{s}_{i}, x_{b})$ \hfill \COMMENT{{\color{Brown}In practice, {reuse} the rollouts from RL in Alg \ref{alg:e-spl}}}
+                \STATE $\Phi_{i, b} = \frac{1}{N} {\sum}_{j=1}^{N} R(x, y_{i, b, j})$
+            \ENDFOR
+        \ENDFOR
+        \STATE $k\leftarrow \mathrm{argmax}_{i} {\sum}_{b} \Phi_{i,b}$ \hfill \COMMENT{{\color{Brown}$\mathbf{s}_{k}$ is the overall top prompt}}
+        \vspace{5pt}
+
+        \STATE $\boldsymbol{\varphi} = [\,]$ \hfill \COMMENT{{\color{Brown}Problems each $\mathbf{s}_{i}$ was the top prompt for}}
+        \FOR{$(\mathbf{s}_{i}, \mu_i, \sigma_i)$ $\textbf{in}$ $\Omega$}
+            \STATE $\rho_{i}=[\,]$
+            \FOR{$x_{b}$ $\textbf{in}$ $\mathcal{B}$}
+                \IF{$i=\mathrm{argmax}_{z} \Phi_{z,b}$}
+                    \STATE $\rho_{i}$.$\mathrm{append}(x_{b})$ \hfill \COMMENT{{\color{Brown} $\mathbf{s}_{i}$ is the top prompt for $x_{b}$}}
+                \ENDIF
+            \ENDFOR
+            \STATE $\boldsymbol{\varphi}.\mathrm{append}((\mathbf{s}_{i}, \rho_{i}))$ \hfill \COMMENT{{\color{Brown}Analyze why $\mathbf{s}_{i}$ did best on $\rho_{i}$}}
+        \ENDFOR
+        \STATE Create {\color{magenta}\textbf{{\text{crossover}} self-reflection}} prompt $\Psi_{\text{cr}}$ using $\boldsymbol{\varphi}$.
+        \vspace{5pt}
+
+        \STATE $\mathrm{diff}_{\text{cr}} \sim \pi_{\text{ref}}(\cdot \mid \mathbf{s}_{k}, \Psi_{\text{cr}})$
+        \STATE $\mathbf{s}_{\text{crossover}} \leftarrow \mathrm{git}.\mathrm{apply}(\mathbf{s}_{k}, \mathrm{diff}_{\text{cr}})$ \hfill  \COMMENT{{\textbf{Crossover step}}}
+        \vspace{5pt}
+
+        \STATE $\mu' = ({\sum}_{i}\frac{\mu_{i}}{\sigma_{i}^{2}})/({\sum}_{i}\frac{1}{\sigma_{i}^{2}})$, $\sigma' = \sqrt{{{1}/({{\sum}_{i}{{1}/{\sigma_{i}^{2}}}}) + \Delta \sigma^{2}}}$
+
+        \STATE \textbf{Return} $(\mathbf{s}_{\text{crossover}}, \mu', \sigma')$
+    \end{algorithmic}
+\end{algorithm}
+
+\paragraph{Crossover is Single-Stage.}
+The crossover operator (Alg.~\ref{alg:crossover}) differs from the mutation operator in the evidence used for reflection. 
+For a batch of problems $\mathcal{B}$, we compute the empirical return matrix
+\begin{align}
+\Phi_{i,b} = \frac{1}{N}\sum_{j=1}^N R(x_b,y_{i,b,j}),
+\end{align}
+by reusing rollouts already generated by RL. For each system prompt $\mathbf{s}_{i}$, we identify which problems $\rho_{i}$ in the batch $\mathcal{B}$ that $\mathbf{s}_{i}$ did best on, yielding a list
+$\boldsymbol{\varphi}$ of prompt-specific wins.  
+The crossover reflection prompt $\Psi_{\text{cr}}$ is constructed from $\boldsymbol{\varphi}$ to contrast the differential strengths of multiple parent prompts.
+
+The reference model then proposes edits applied to the overall top-performing prompt $\mathbf{s}_k$:
+\begin{align}
+\mathrm{diff}_{\text{cr}} \sim \pi_{\text{ref}}(\cdot \mid \mathbf{s}_k, \Psi_{\text{cr}}), \qquad
+\mathbf{s}_{\text{crossover}} \leftarrow \mathrm{git.apply}(\mathbf{s}_k, \mathrm{diff}_{\text{cr}}),
+\end{align}
+producing a child prompt that selectively recombines complementary instruction segments from multiple parents.
+
+
 
 \begin{figure}[t]
-\vspace{0pt}
   \centering
-  \includegraphics[width=0.95\textwidth]{figures/evo-tree-4-v2.pdf}
-  \label{fig:evo-tree-1}
-  \vspace{-2pt}
-  \caption{\textbf{TrueSkill scores learned from train-time rankings are predictive of relative test-time performance of system prompts.} E-SPL treats each RL iteration as a set of relative comparisons between system prompts for TrueSkill message passing. The visualization shows that E-SPL effectively aggregates noisy train-time comparisons into a stable and informative criterion for evolutionary selection.}
+  \vspace{0pt}
+  \includegraphics[width=0.95\textwidth]{figures/e-spl-detailed-pipeline-v2.pdf}
+  \vspace{10pt}
+  \caption{\textbf{Detailed overview of the E-SPL pipeline}, which illustrates how \autoref{fig:method-overview}, \autoref{fig:mutation-operator}, and \autoref{fig:crossover-operator} fit into a single algorithm.}
+  \label{fig:e-spl-pipeline-details}
+  \vspace{-10pt}
 \end{figure}
 
+
+
+\subsection{Trajectory Summarization in Mutation Self-Reflection}
+\label{sec:appendix-trajectory-summary}
+
+Before proposing local edits, E-SPL first converts raw RL rollouts into structured trajectory summaries.  
+For the selected parent prompt $\mathbf{s}_k$, all sampled solutions are grouped by problem instance $x$.  
+Let $\mathcal{R}_x=\{(x,y_{k,j},r_{k,j})\}_{j=1}^{N}$ denote the group of rollouts produced for problem $x$ under $\mathbf{s}_k$. E-SPL only performs self-reflection on problems where the model has both made some mistakes and achieved some success $(0 < V_{i} < 1)$.
+Self-reflection focuses on cases where we can \emph{contrast} successes and failures under identical instructions.
+
+For each rollout in a problem-specific group, the reference model $\pi_{\text{ref}}$ is prompted to generate a step-by-step summary describing:
+(i) the reasoning steps taken, 
+(ii) which principles or strategies in the system prompt were (implicitly) used, and 
+(iii) where detours or errors occurred, given the rollout outcome and ground-truth answer.  
+
+These summaries preserve the full reasoning outcomes while explicitly highlighting failure modes, producing a compact representation suitable for higher-level self-critique.
+
+\subsection{Self-Critique in Mutation Self-Reflection}
+\label{sec:appendix-local-critique}
+
+For each problem $x$, E-SPL constructs a self-critique prompt that jointly presents:
+\vspace{-5pt}
+\begin{itemize}
+    \item multiple trajectory summaries from $\mathcal{R}_x$, labeled as successful or incorrect,
+    \item the current system prompt $\mathbf{s}_k$,
+    \item the ground-truth answer.
+\end{itemize}
+The reference model $\pi_{\text{ref}}$ is instructed to analyze these contrasted trajectories to:
+\vspace{-5pt}
+\begin{enumerate}
+    \item identify reasoning patterns that consistently led to success,
+    \item diagnose systematic failure modes, and consider additional guidance that would be needed to avoid those failure modes,
+    \item determine whether existing principles in the system prompt are insufficient or require further editing.
+\end{enumerate}
+Based on this analysis, the model proposes a number of structured update operations:
+\begin{itemize}
+    \item \textbf{add}: introduce a new general principle (or high-level strategy / repeatable workflow) to the system prompt;
+    \item \textbf{modify}: refine an existing principle to better encode successful strategies or avoid observed errors.
+\end{itemize}
+Each proposed principle is designed to express an abstract decision heuristic rather than problem-specific calculations, ensuring transferability across tasks.
+
+\subsection{Local Edit Proposal Module}
+\label{sec:appendix-max-ops}
+
+To stabilize evolution and prevent overly aggressive prompt drift, E-SPL limits the number of edits proposed per problem instance. Specifically, each per-problem self-critique stage is restricted to produce at most $K_{\text{ops}}$ edit operations, where $K_{\text{ops}}$ is a tunable hyperparameter (set to $K_{\text{ops}}=2$ in our experiments). The goal of this design is to encourage incremental knowledge accumulation and localized corrections driven by concrete failures.
+
+Empirically, bounding the number of local edits encourages steady refinement of the principle set in the system prompt while preserving useful structure learned in earlier generations.
+
+
 \begin{figure}[t]
+  \centering
+  \vspace{15pt}
+  \includegraphics[width=1.0\textwidth]{figures/self-reflection-operator-v2.pdf}
+  \vspace{-10pt}
+  \caption{\textbf{Self-Reflection Module in Mutation} (where the best-performing system prompt $\mathbf{s}_{k}$ is edited) consists of four sequential modules: trajectory summarization (\S\ref{sec:appendix-trajectory-summary}), self-critique (\S\ref{sec:appendix-local-critique}), local edit proposal (\S\ref{sec:appendix-max-ops}), local-to-global aggregation (\S\ref{sec:appendix-global-revision}).}
+  \label{fig:self-reflection-operator}
+  \vspace{0pt}
+\end{figure}
+
+
+
+\subsection{Local-to-Global Aggregation Module}
+\label{sec:appendix-global-revision}
+
+During a training step, multiple problems may independently propose local edits. Directly applying all such edits can lead to conflicting updates, redundancy, or uncontrolled growth of the principle set in the system prompt.
+
+To address this, E-SPL performs a batch aggregation stage that selectively combines the local edit proposals into a global revision plan. Given the selected system prompt $\mathbf{s}_{k}$ and the collection of proposed edits, the reference model is prompted to:
+\begin{itemize}
+    \item refine individual edits to incorporate repeated evidence,
+    \item merge semantically overlapping principles or strategies into more general formulations.
+\end{itemize}
+The resulting revision plan consists of two types of operations:
+\begin{itemize}
+    \item \textbf{modify} operation on an existing principle, which aggregates all proposed edits to that principle across the batch,
+    \item \textbf{merge} operation, which replaces several related principles with a unified higher-level strategy / more universal rule across domains.
+\end{itemize}
+All final principles in the system prompt are encouraged to be short, abstract, and strategy-oriented, yielding a compact declarative knowledge base that evolves steadily throughout training.
+
+\subsection{Hyper-parameters}
+\label{sec:appendix-hyperparameters}
+
+We use the following hyper-parameters:
+\begin{itemize}
+    \item LoRA \citep{lora} rank of 32, learning rate $\alpha$=4e-5, using Adam optimizer \citep{kingma2014adam} with $\beta=(0.9, 0.95)$.
+    \item Batch size of 10 (problems per batch). Group size $N=5$ for the number of rollouts to sample per system prompt.
+    \item Sliding window size $K=10$ for the population $\mathcal{S}$.  Number of system prompts per batch $M=3$.
+    \item Uncertainty in genetic operators: $\Delta\sigma=1$, uncertainty bonus: $\lambda=2.0$; the crossover probability $p_{\text{crossover}}=0.2$.
+    \item TrueSkill (all defaults): $\mu_{0}=25$, $\sigma_0=25/3$, beta=$25/6$, tau=$25/300$, draw probability=$0.10$.
+    \item We find that a simplified selection strategy is quite effective: always add the system prompt with the highest score $(\mathrm{score}_{i} = \mu_{i}+\lambda \sigma_{i})$ to the batch, but randomly sample from the rest of the sliding window.
+    \item $K_{\text{ops}}=2$, where $K_{\text{ops}}$ is the maximum number of local edits per problem in the mutation operator.
+\end{itemize}
+
+\textbf{Root node system prompt for agentic search:}
+\begin{WrapVerbatim}
+SEARCH_TASK_INSTRUCTIONS = """You are an expert assistant who solves tasks using a Wikipedia search tool.
+
+Here are instructions for how to solve a problem:
+1. Think step by step before calling the tool and after you receive the result of the tool call. Decide what queries to call the tool with.
+2. Call the tool with the queries you have decided on.
+3. Think step by step again after you receive the result of the tool call. If you have the information you need, you can stop here.
+4. Otherwise, come up with new queries that combine information from the previous results.
+5. Include your final answer after the "Answer:" prefix. The answer should be between one to five words.
+
+Here is an example of solving a real question:
+"Between 2020 and 2025, which year did New York City see the most population growth and how did San Francisco population change in that year?"
+
+1. Think step by step: In order to answer this question, I need to know the population of New York City and San Francisco between 2020 and 2025. I will search for the population of New York City in each year
+2. Calling search tool: <tool_call>{"name": "search", "arguments": {"query_list": ["Population New York city between 2020 and 2025"]}}</tool_call> (Output omitted for brevity)
+3. Think step by step again: I have the population of New York City in each year, and I see that the population of New York City grew the most in 2024. I need to know the population of San Francisco in 2024. I will search for the population of San Francisco in each year.
+<tool_call>{"name": "search", "arguments": {"query_list": ["Population San Francisco between 2023 and 2024"]}}</tool_call> (Output omitted for brevity)
+4. Answer: The population of New York City grew the most in 2024, and the population of San Francisco changed by XXXX in 2024.
+"""
+\end{WrapVerbatim}
+
+\clearpage
+\newpage
+
+
+\subsection{Effect of Crossover: Extended Discussion}
+
+\autoref{fig:evo-tree-2} visualizes evolutionary trees produced during training. The crossover operator enables knowledge transfer across different branches of the evolutionary tree, but at the cost of reduced \emph{speciation} -- long-term separation between evolutionary lineages. Prior work \citep{ga-in-search, eshelman1991preventing, mahfoud1995niching, vose1999-simple-ga} supports our observations: crossover can accelerate short-term progress by mixing useful substructures, but it can also wash out subpopulation structure, reduce long-run diversity, and increase the risk of premature homogenization and convergence.
+
+Mutation-only behaves more like independent local hill-climbs along separate lineages. Lineages stay separated longer, so we can keep parallel hypotheses alive \citep{holland1992adaptation}. Mutation + Crossover accelerates early progress by re-combining partial improvements, but the population may rapidly converge around a locally high-performing system prompt, limiting exploration of qualitatively and structurally distinct high-quality solutions \citep{spears1993crossover}. Classically, this tradeoff can be significantly improved by a class of techniques called \emph{niching}, which include fitness sharing \citep{genetic-algorithm}, mating restriction \citep{investigation-of-species-formation}, and the island model \citep{island-model}. We leave the application of niching to E-SPL for future work.
+
+\begin{figure}[H]
   \centering
   \includegraphics[width=0.8\textwidth]{figures/crossover_effect_v2.pdf}
   \vspace{-6pt}
@@ -588,6 +801,8 @@ We have shown that unifying RL and evolutionary prompt search significantly enha
 \end{figure}
 
 \subsection{Discovered System Prompt for Agentic Search}
+
+\autoref{tab:prompt-evolution-search} shows the full system prompt discovered by E-SPL for the agentic search task, including the workflow before and after evolution.
 
 \begin{figure}[!tb]
 \centering
@@ -685,6 +900,8 @@ before you \emph{everr} write the final \texttt{Answer:} line.
 \end{figure}
 
 \subsection{Additional Examples of E-SPL Model Behavior}
+
+\autoref{tab:example-e-spl-1} and \autoref{tab:example-e-spl-2} provide detailed examples of how the RL model learns to utilize principles from learned system prompts to solve challenging math problems.
 
 \begin{figure}[!tb]
 \centering
@@ -823,229 +1040,6 @@ So the maximum is $M = 2^{3525}$. Then $M \mod 1000 = 2^{3525} \mod 1000$. \quad
 \label{tab:example-e-spl-2}
 
 \end{figure}
-
-\subsection{LLM-Based Self-Reflection for Mutation and Crossover}
-\label{sec:appendix-self-reflection}
-
-E-SPL implements both mutation and crossover as LLM-driven editing operators over past system prompts. The mutation operator consists of (i) a self-reflection stage that diagnoses performance from RL rollouts (which has two steps: trajectory summarization and self-critique), followed by (ii) a patch synthesis stage that applies structured edits to the parent prompt using a git-style diff (which has two steps: local edit proposals and local-to-global aggregation). On the other hand, the crossover operator has a single stage.
-
-\begin{algorithm}[t]
-\caption{$\mathrm{Crossover}(\mathcal{B}, R, \Omega, \pi_{\theta}, \pi_{\text{ref}} )$}
-    \label{alg:crossover}
-    \begin{algorithmic}
-        \STATE {\bfseries Input:} List of $B$ problems: $\mathcal{B}$; reward function $R(\cdot, \cdot)$.
-        \STATE {\bfseries Input:} List of $M$ system prompts: $\Omega$.
-        \STATE {\bfseries Input:} RL policy $\pi_{\theta}(\cdot)$, reference policy $\pi_{\text{ref}}(\cdot)$.
-        \vspace{5pt}
-
-        \STATE Let $\Phi \in \mathbb{R}^{M \times B}$ \hfill \COMMENT{{\color{Brown}$\Phi_{i,b}$ is the empirical return of the $i$-th system prompt in $\Omega$ on the $b$-th problem in $\mathcal{B}$}}
-        \FOR{$(\mathbf{s}_{i}, \mu_i, \sigma_i)$ $\textbf{in}$ $\Omega$}
-            \FOR{$x_{b}$ $\textbf{in}$ $\mathcal{B}$}
-                \STATE Sample $\{y_{i, b, j}\}_{j=1}^{N}$ from $\pi_{\theta}$: $y_{i, b, j}\sim \pi_{\theta}(\cdot \mid \mathbf{s}_{i}, x_{b})$ \hfill \COMMENT{{\color{Brown}In practice, {reuse} the rollouts from RL in Alg \ref{alg:e-spl}}}
-                \STATE $\Phi_{i, b} = \frac{1}{N} {\sum}_{j=1}^{N} R(x, y_{i, b, j})$
-            \ENDFOR
-        \ENDFOR
-        \STATE $k\leftarrow \mathrm{argmax}_{i} {\sum}_{b} \Phi_{i,b}$ \hfill \COMMENT{{\color{Brown}$\mathbf{s}_{k}$ is the overall top prompt}}
-        \vspace{5pt}
-
-        \STATE $\boldsymbol{\varphi} = [\,]$ \hfill \COMMENT{{\color{Brown}Problems each $\mathbf{s}_{i}$ was the top prompt for}}
-        \FOR{$(\mathbf{s}_{i}, \mu_i, \sigma_i)$ $\textbf{in}$ $\Omega$}
-            \STATE $\rho_{i}=[\,]$
-            \FOR{$x_{b}$ $\textbf{in}$ $\mathcal{B}$}
-                \IF{$i=\mathrm{argmax}_{z} \Phi_{z,b}$}
-                    \STATE $\rho_{i}$.$\mathrm{append}(x_{b})$ \hfill \COMMENT{{\color{Brown} $\mathbf{s}_{i}$ is the top prompt for $x_{b}$}}
-                \ENDIF
-            \ENDFOR
-            \STATE $\boldsymbol{\varphi}.\mathrm{append}((\mathbf{s}_{i}, \rho_{i}))$ \hfill \COMMENT{{\color{Brown}Analyze why $\mathbf{s}_{i}$ did best on $\rho_{i}$}}
-        \ENDFOR
-        \STATE Create {\color{magenta}\textbf{{\text{crossover}} self-reflection}} prompt $\Psi_{\text{cr}}$ using $\boldsymbol{\varphi}$.
-        \vspace{5pt}
-
-        \STATE $\mathrm{diff}_{\text{cr}} \sim \pi_{\text{ref}}(\cdot \mid \mathbf{s}_{k}, \Psi_{\text{cr}})$
-        \STATE $\mathbf{s}_{\text{crossover}} \leftarrow \mathrm{git}.\mathrm{apply}(\mathbf{s}_{k}, \mathrm{diff}_{\text{cr}})$ \hfill  \COMMENT{{\textbf{Crossover step}}}
-        \vspace{5pt}
-
-        \STATE $\mu' = ({\sum}_{i}\frac{\mu_{i}}{\sigma_{i}^{2}})/({\sum}_{i}\frac{1}{\sigma_{i}^{2}})$, $\sigma' = \sqrt{{{1}/({{\sum}_{i}{{1}/{\sigma_{i}^{2}}}}) + \Delta \sigma^{2}}}$
-
-        \STATE \textbf{Return} $(\mathbf{s}_{\text{crossover}}, \mu', \sigma')$
-    \end{algorithmic}
-\end{algorithm}
-
-\paragraph{Mutation is Multi-Stage.}
-In each RL iteration of Alg.~\ref{alg:e-spl}, we identify the best-performing system prompt
-\begin{align}
-k \leftarrow \arg\max_i V_i, \qquad V_i = \frac{1}{N}\sum_{j=1}^N R(x,y_{i,j}),
-\end{align}
-where the returns are computed under matched conditions for all sampled prompts.
-
-\paragraph{Self-Reflection Module in Mutation} Let $\mathcal{E}_k = \{(x,y_{k,j},r_{k,j})\}_{j=1}^N$ denote the rollouts produced under $\mathbf{s}_k$. 
-The self-reflection prompt $\Psi_{\text{reflect}}$ instructs the reference model $\pi_{\text{ref}}$ to summarize these trajectories (\textbf{Trajectory Summarization}, \S\ref{sec:appendix-trajectory-summary}), attribute successes and failures to specific reasoning behaviors (\textbf{Self-Critique}, \S\ref{sec:appendix-local-critique}), and produce lessons $\ell$:
-\begin{align}
-\ell \sim \pi_{\text{ref}}(\cdot \mid \Psi_{\text{reflect}}, \mathcal{E}_k).
-\end{align}
-\paragraph{Local Edit Proposal (\S\ref{sec:appendix-max-ops})}
-Given the reflection output $\ell$, we generate concrete edits to the parent system prompt:
-\begin{align}
-\mathrm{diff} \sim \pi_{\text{ref}}(\cdot \mid \mathbf{s}_k, \ell)
-\end{align}
-for each problem $x$ in the batch $\mathcal{B}$. Each $\mathrm{diff}$ is a list of local edits. Now we need a mechanism to aggregate those individual per-problem edits across a batch of problems.
-
-\paragraph{Local-to-Global Aggregation (\S\ref{sec:appendix-global-revision})}
-To reconcile overlapping edits to the system prompt proposed by parallel self-reflection processes, E-SPL aggregates these edits using a consolidation prompt that produces a global revision plan consisting of:
-\begin{itemize}
-    \item \textbf{modify}: refine an existing principle using accumulated evidence,
-    \item \textbf{merge}: combine semantically similar principles into a more general form.
-\end{itemize}
-Each resulting principle in the system prompt should be short, abstract, and strategy-focused, preventing uncontrolled growth of the system prompt length. We then apply the global editing operations:
-\begin{align}
-    \mathbf{s}_{\text{mutate}} \leftarrow \mathrm{git.apply}(\mathbf{s}_k, \mathrm{diff})
-\end{align}
-The resulting child system prompt is added to the population with inherited rating and increased uncertainty as in Alg.~\ref{alg:e-spl}. The diff format is especially important as system prompts grow longer.
-
-\paragraph{Crossover is Single-Stage.}
-The crossover operator (Alg.~\ref{alg:crossover}) differs from the mutation operator in the evidence used for reflection. 
-For a batch of problems $\mathcal{B}$, we compute the empirical return matrix
-\begin{align}
-\Phi_{i,b} = \frac{1}{N}\sum_{j=1}^N R(x_b,y_{i,b,j}),
-\end{align}
-by reusing rollouts already generated by RL. For each system prompt $\mathbf{s}_{i}$, we identify which problems $\rho_{i}$ in the batch $\mathcal{B}$ that $\mathbf{s}_{i}$ did best on, yielding a list
-$\boldsymbol{\varphi}$ of prompt-specific wins.  
-The crossover reflection prompt $\Psi_{\text{cr}}$ is constructed from $\boldsymbol{\varphi}$ to contrast the differential strengths of multiple parent prompts.
-
-The reference model then proposes edits applied to the overall top-performing prompt $\mathbf{s}_k$:
-\begin{align}
-\mathrm{diff}_{\text{cr}} \sim \pi_{\text{ref}}(\cdot \mid \mathbf{s}_k, \Psi_{\text{cr}}), \qquad
-\mathbf{s}_{\text{crossover}} \leftarrow \mathrm{git.apply}(\mathbf{s}_k, \mathrm{diff}_{\text{cr}}),
-\end{align}
-producing a child prompt that selectively recombines complementary instruction segments from multiple parents.
-
-
-
-\begin{figure}[t]
-  \centering
-  \vspace{0pt}
-  \includegraphics[width=0.95\textwidth]{figures/e-spl-detailed-pipeline-v2.pdf}
-  \vspace{10pt}
-  \caption{\textbf{Detailed overview of the E-SPL pipeline}, which illustrates how \autoref{fig:method-overview}, \autoref{fig:mutation-operator}, and \autoref{fig:crossover-operator} fit into a single algorithm.}
-  \label{fig:e-spl-pipeline-details}
-  \vspace{-10pt}
-\end{figure}
-
-
-
-\subsection{Trajectory Summarization in Mutation Self-Reflection}
-\label{sec:appendix-trajectory-summary}
-
-Before proposing local edits, E-SPL first converts raw RL rollouts into structured trajectory summaries.  
-For the selected parent prompt $\mathbf{s}_k$, all sampled solutions are grouped by problem instance $x$.  
-Let $\mathcal{R}_x=\{(x,y_{k,j},r_{k,j})\}_{j=1}^{N}$ denote the group of rollouts produced for problem $x$ under $\mathbf{s}_k$. E-SPL only performs self-reflection on problems where the model has both made some mistakes and achieved some success $(0 < V_{i} < 1)$.
-Self-reflection focuses on cases where we can \emph{contrast} successes and failures under identical instructions.
-
-For each rollout in a problem-specific group, the reference model $\pi_{\text{ref}}$ is prompted to generate a step-by-step summary describing:
-(i) the reasoning steps taken, 
-(ii) which principles or strategies in the system prompt were (implicitly) used, and 
-(iii) where detours or errors occurred, given the rollout outcome and ground-truth answer.  
-
-These summaries preserve the full reasoning outcomes while explicitly highlighting failure modes, producing a compact representation suitable for higher-level self-critique.
-
-\subsection{Self-Critique in Mutation Self-Reflection}
-\label{sec:appendix-local-critique}
-
-For each problem $x$, E-SPL constructs a self-critique prompt that jointly presents:
-\vspace{-5pt}
-\begin{itemize}
-    \item multiple trajectory summaries from $\mathcal{R}_x$, labeled as successful or incorrect,
-    \item the current system prompt $\mathbf{s}_k$,
-    \item the ground-truth answer.
-\end{itemize}
-The reference model $\pi_{\text{ref}}$ is instructed to analyze these contrasted trajectories to:
-\vspace{-5pt}
-\begin{enumerate}
-    \item identify reasoning patterns that consistently led to success,
-    \item diagnose systematic failure modes, and consider additional guidance that would be needed to avoid those failure modes,
-    \item determine whether existing principles in the system prompt are insufficient or require further editing.
-\end{enumerate}
-Based on this analysis, the model proposes a number of structured update operations:
-\begin{itemize}
-    \item \textbf{add}: introduce a new general principle (or high-level strategy / repeatable workflow) to the system prompt;
-    \item \textbf{modify}: refine an existing principle to better encode successful strategies or avoid observed errors.
-\end{itemize}
-Each proposed principle is designed to express an abstract decision heuristic rather than problem-specific calculations, ensuring transferability across tasks.
-
-\subsection{Local Edit Proposal Module}
-\label{sec:appendix-max-ops}
-
-To stabilize evolution and prevent overly aggressive prompt drift, E-SPL limits the number of edits proposed per problem instance. Specifically, each per-problem self-critique stage is restricted to produce at most $K_{\text{ops}}$ edit operations, where $K_{\text{ops}}$ is a tunable hyperparameter (set to $K_{\text{ops}}=2$ in our experiments). The goal of this design is to encourage incremental knowledge accumulation and localized corrections driven by concrete failures.
-
-Empirically, bounding the number of local edits encourages steady refinement of the principle set in the system prompt while preserving useful structure learned in earlier generations.
-
-
-\begin{figure}[t]
-  \centering
-  \vspace{15pt}
-  \includegraphics[width=1.0\textwidth]{figures/self-reflection-operator-v2.pdf}
-  \vspace{-10pt}
-  \caption{\textbf{Self-Reflection Module in Mutation} (where the best-performing system prompt $\mathbf{s}_{k}$ is edited) consists of four sequential modules: trajectory summarization (\S\ref{sec:appendix-trajectory-summary}), self-critique (\S\ref{sec:appendix-local-critique}), local edit proposal (\S\ref{sec:appendix-max-ops}), local-to-global aggregation (\S\ref{sec:appendix-global-revision}).}
-  \label{fig:self-reflection-operator}
-  \vspace{0pt}
-\end{figure}
-
-
-
-\subsection{Local-to-Global Aggregation Module}
-\label{sec:appendix-global-revision}
-
-During a training step, multiple problems may independently propose local edits. Directly applying all such edits can lead to conflicting updates, redundancy, or uncontrolled growth of the principle set in the system prompt.
-
-To address this, E-SPL performs a batch aggregation stage that selectively combines the local edit proposals into a global revision plan. Given the selected system prompt $\mathbf{s}_{k}$ and the collection of proposed edits, the reference model is prompted to:
-\begin{itemize}
-    \item refine individual edits to incorporate repeated evidence,
-    \item merge semantically overlapping principles or strategies into more general formulations.
-\end{itemize}
-The resulting revision plan consists of two types of operations:
-\begin{itemize}
-    \item \textbf{modify} operation on an existing principle, which aggregates all proposed edits to that principle across the batch,
-    \item \textbf{merge} operation, which replaces several related principles with a unified higher-level strategy / more universal rule across domains.
-\end{itemize}
-All final principles in the system prompt are encouraged to be short, abstract, and strategy-oriented, yielding a compact declarative knowledge base that evolves steadily throughout training.
-
-We use the following hyper-parameters:
-\begin{itemize}
-    \item LoRA \citep{lora} rank of 32, learning rate $\alpha$=4e-5, using Adam optimizer \citep{kingma2014adam} with $\beta=(0.9, 0.95)$.
-    \item Batch size of 10 (problems per batch). Group size $N=5$ for the number of rollouts to sample per system prompt.
-    \item Sliding window size $K=10$ for the population $\mathcal{S}$.  Number of system prompts per batch $M=3$.
-    \item Uncertainty in genetic operators: $\Delta\sigma=1$, uncertainty bonus: $\lambda=2.0$; the crossover probability $p_{\text{crossover}}=0.2$.
-    \item TrueSkill (all defaults): $\mu_{0}=25$, $\sigma_0=25/3$, beta=$25/6$, tau=$25/300$, draw probability=$0.10$.
-    \item We find that a simplified selection strategy is quite effective: always add the system prompt with the highest score $(\mathrm{score}_{i} = \mu_{i}+\lambda \sigma_{i})$ to the batch, but randomly sample from the rest of the sliding window.
-    \item $K_{\text{ops}}=2$, where $K_{\text{ops}}$ is the maximum number of local edits per problem in the mutation operator.
-\end{itemize}
-
-\textbf{Root node system prompt for agentic search:}
-\begin{WrapVerbatim}
-SEARCH_TASK_INSTRUCTIONS = """You are an expert assistant who solves tasks using a Wikipedia search tool.
-
-Here are instructions for how to solve a problem:
-1. Think step by step before calling the tool and after you receive the result of the tool call. Decide what queries to call the tool with.
-2. Call the tool with the queries you have decided on.
-3. Think step by step again after you receive the result of the tool call. If you have the information you need, you can stop here.
-4. Otherwise, come up with new queries that combine information from the previous results.
-5. Include your final answer after the "Answer:" prefix. The answer should be between one to five words.
-
-Here is an example of solving a real question:
-"Between 2020 and 2025, which year did New York City see the most population growth and how did San Francisco population change in that year?"
-
-1. Think step by step: In order to answer this question, I need to know the population of New York City and San Francisco between 2020 and 2025. I will search for the population of New York City in each year
-2. Calling search tool: <tool_call>{"name": "search", "arguments": {"query_list": ["Population New York city between 2020 and 2025"]}}</tool_call> (Output omitted for brevity)
-3. Think step by step again: I have the population of New York City in each year, and I see that the population of New York City grew the most in 2024. I need to know the population of San Francisco in 2024. I will search for the population of San Francisco in each year.
-<tool_call>{"name": "search", "arguments": {"query_list": ["Population San Francisco between 2023 and 2024"]}}</tool_call> (Output omitted for brevity)
-4. Answer: The population of New York City grew the most in 2024, and the population of San Francisco changed by XXXX in 2024.
-"""
-\end{WrapVerbatim}
-
-\clearpage
-\newpage
-
-
 \section{TrueSkill-Based Fitness Modeling for E-SPL}
 \label{sec:appendix-trueskill}
 
