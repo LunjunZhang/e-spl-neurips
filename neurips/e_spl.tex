@@ -130,6 +130,7 @@ Overall, our results demonstrate that RL and system prompt evolution are deeply 
   \includegraphics[width=0.44\textwidth]{figures/evo-hook-v2.pdf}
   \caption{\textbf{Evolving System Prompts helps RL generalize better}.}
   \label{fig:hook}
+
   \vspace{-12pt}
 \end{wrapfigure}
 
@@ -144,15 +145,15 @@ Evolutionary algorithms (EA) and reinforcement learning (RL) have long been stud
   \vspace{-10pt}
   \caption{\textbf{Evolutionary System Prompt Learning (E-SPL)} jointly optimizes model contexts and model weights to enhance LLM self-improvement. {Evolution updates system prompts; RL updates weights. The learned system prompts can encode \textit{declarative knowledge} via articulated principles and strategies, while RL gradients can further hone the model's \textit{procedural knowledge} for reliable execution.}}
   \label{fig:method-overview}
-  \vspace{-15pt}
+  \vspace{-10pt}
 \end{figure}
 
 
 Recent work on prompt evolution and LLM agents demonstrates that prompt (or context) engineering is a powerful mechanism for improving test-time performance. Techniques such as self-reflection \citep{reflexion, self-refine, train-free-grpo} and population-based search \citep{evoprompt, promptbreeder, romera2024mathematical, gepa} show that prompts can encode substantial declarative knowledge and behavioral priors without modifying model weights. At the same time, RL has emerged as the predominant post-training approach to fundamentally improve reasoning capabilities \citep{o1-system-card, deepseek-r1, cispo, gemini-2.5}. Despite their complementary strengths, existing approaches typically optimize model contexts and weights in isolation, leaving their potential synergies unexplored.
 
-In this work, we argue that effective self-improving agents should jointly evolve their high-level behavioral specifications and their low-level parametric policies. This perspective motivates \textbf{Evolutionary System Prompt Learning (E-SPL)}, a framework that tightly couples reinforcement learning over model weights with evolutionary search over system prompts. By maintaining a population of system prompts that are evaluated, rated, and evolved alongside RL training, E-SPL enables structured exploration over declarative knowledge while encoding procedural knowledge into weights. This joint optimization yields a synergistic dynamics in which improved prompts accelerate learning, and improved weights amplify the benefits of prompt evolution.
+In this work, we argue that effective self-improving agents should jointly evolve their high-level behavioral specifications and their low-level parametric policies. This perspective motivates \textbf{Evolutionary System Prompt Learning (E-SPL)}, a framework that tightly couples reinforcement learning over model weights with evolutionary search over system prompts. By maintaining a population of system prompts that are evaluated, rated, and evolved alongside RL training, E-SPL enables structured exploration over declarative knowledge while encoding procedural knowledge into weights. This joint optimization yields synergistic dynamics in which improved prompts accelerate learning, and improved weights amplify the benefits of prompt evolution.
 
-Experimentally, E-SPL enhances RL performance from $56.3\%\rightarrow 60.6\%$ on AIME 2025, $50.0\%\rightarrow 52.7\%$ on HMMT 2025 November test, and notably, $38.8\% \rightarrow 45.1\%$ on AIME $\rightarrow$ BeyondAIME in an easy-to-hard generalization setting, using a base model of DeepSeek v3.1 \citep{deepseekv3}. E-SPL significantly outperforms prompt evolution as well, showing that weight updates are often necessary for improving the model's tacit knowledge and intuition. On an agentic search task \citep{search-r1}, we improved RL performance from $44.2\% \rightarrow 48.6\%$ on OpenAI's gpt-oss-120b \citep{openai-gpt-oss} with limited data. These results show that combining RL and system prompt evolution unlocks a synergistic form of self-improvement that neither approach achieves in isolation.
+Experimentally, E-SPL enhances RL performance from $56.3\%\rightarrow 60.6\%$ on AIME 2025, $50.0\%\rightarrow 52.7\%$ on HMMT 2025 November test, and notably, $38.8\% \rightarrow 45.1\%$ on AIME $\rightarrow$ BeyondAIME in an easy-to-hard generalization setting, using a base model of DeepSeek-v3.1 \citep{deepseekv3}. E-SPL significantly outperforms prompt evolution as well, showing that weight updates are often necessary for improving the model's tacit knowledge and intuition. On an agentic search task \citep{search-r1}, we improved RL performance from $44.2\% \rightarrow 48.6\%$ on OpenAI's gpt-oss-120b \citep{openai-gpt-oss} with limited data. These results show that combining RL and system prompt evolution unlocks a synergistic form of self-improvement that neither approach achieves in isolation.
 
 
 \begin{figure}[t]
@@ -171,7 +172,7 @@ Experimentally, E-SPL enhances RL performance from $56.3\%\rightarrow 60.6\%$ on
 \centering
 \vspace{8pt}
 
-\begin{runcard}[title={Discovered System Prompts for Solving Math Problems (deepseek v3.1)}]
+\begin{runcard}[title={Discovered System Prompts for Solving Math Problems (DeepSeek-v3.1)}]
 
 {\textbf{[1]}} For generating functions with a numerator $(1 - x^M)^k$ and a denominator as a product of geometric series, the coefficient of $x^N$ is a sum over $j$ of binomial coefficients times the number of solutions to a Diophantine equation. If $N < M$, only the $j=0$ term contributes. For $N \geq M$, multiple $j$ may contribute, and the signs from the binomial coefficients must be considered.
 
@@ -196,7 +197,7 @@ Experimentally, E-SPL enhances RL performance from $56.3\%\rightarrow 60.6\%$ on
 \caption{\centering
 \textbf{Discovered strategies in learned System Prompts for solving math problems.} Those explicit behavior specifications include: useful heuristics and tips for various categories of problems, self-verification strategies such as checking for consistency and plausibility, a list of common failure modes to avoid, etc. Note that RL is done under diverse system prompts, and does not overfit to any particular one.
 }
-\label{tab:examples-principles}
+\label{fig:examples-principles}
 \vspace{-10pt}
 \end{figure}
 
@@ -209,7 +210,7 @@ Experimentally, E-SPL enhances RL performance from $56.3\%\rightarrow 60.6\%$ on
   \vspace{-14pt}
   \caption{\textbf{Mutation operator} in E-SPL. The highest-performing prompt in each iteration undergoes \textbf{LLM self-reflection} on group-wise agent trajectories and their outcomes. An LLM-generated $\mathrm{diff}$ edits the parent into a child system prompt, removing ineffective rules and converting observed mistakes into improved declarative instructions, yielding a new prompt that enters the evolutionary population.}
   \label{fig:mutation-operator}
-  \vspace{-15pt}
+  \vspace{-10pt}
 \end{figure}
 
 
@@ -240,7 +241,7 @@ Evolutionary and search-based approaches such as EvoPrompt \citep{evoprompt}, Pr
 
 \section{Method}
 
-E-SPL conditions RL weight updates on a population of system prompts, and reuse the resulting RL data to jointly evolve this population via two genetic operators, mutation and crossover, both of which are based on LLM self-reflection.
+E-SPL conditions RL weight updates on a population of system prompts, and reuses the resulting RL data to jointly evolve this population via two genetic operators, mutation and crossover, both of which are based on LLM self-reflection.
 \textbf{We design the evolutionary algorithm to be directly compatible with RL post-training pipelines, allowing RL to benefit from an evolving repertoire of declarative knowledge} while incurring minimal additional overhead.
 
 \vspace{-5pt}
@@ -317,7 +318,7 @@ Our EA reuses RL rollout statistics directly, eliminating the held-out evaluatio
 
 
 \vspace{-5pt}
-\paragraph{Crossover} While mutation evolves individual lineages, crossover recombines knowledge across parents. We evaluate $M$ prompts on a batch $\mathcal{B}$ of $B$ problems, yielding a score matrix $\Phi \in \mathbb{R}^{M\times B}$ where $\Phi_{i,b}$ captures the per-problem advantage of each prompt. The problem-wise strengths identified by $\Phi$ are incorporated into the crossover reflection prompt $\Psi_{\mathrm{cr}}$, grounding self-reflection in concrete differential advantages and enabling targeted recombination. The resulting $\mathbf{s}_{\text{crossover}}$ is added to $\mathcal{S}$ with a precision-weighted average of the parents’ ratings (\cref{alg:crossover}).
+\paragraph{Crossover} While mutation evolves individual lineages, crossover recombines knowledge across parents. We evaluate $M$ prompts on a batch $\mathcal{B}$ of $B$ problems, yielding a score matrix $\Phi \in \mathbb{R}^{M\times B}$ where $\Phi_{i,b}$ captures the per-problem performance of each prompt. The problem-wise strengths identified by $\Phi$ are incorporated into the crossover reflection prompt $\Psi_{\mathrm{cr}}$, grounding self-reflection in concrete differential advantages and enabling targeted recombination. The resulting $\mathbf{s}_{\text{crossover}}$ is added to $\mathcal{S}$ with a precision-weighted average of the parents’ ratings (\cref{alg:crossover}).
 
 \vspace{-5pt}
 \paragraph{Summary} E-SPL augments RL post-training with an evolutionary algorithm based on self-reflection from experience. In parallel with RL updates, E-SPL uses relative performance rankings of system prompts to inform evolutionary selection. Mutation and crossover operators, both driven by LLM self-reflection, produce new system prompts with minimal computational overhead.
@@ -348,7 +349,7 @@ We evaluate E-SPL on mathematical reasoning and agentic search benchmarks, askin
 Our main evaluations include: \textbf{(1) DAPO100$\rightarrow$AIME25}, which follows the protocols from \citep{train-free-grpo} that trains on $100$ selected problems from the DAPO dataset \citep{dapo} and tests on AIME 2025 competition; \textbf{(2) HMMT 23/24$\rightarrow$25}, which uses all of HMMT 2023, 2024, and February 2025 problems as training set, and November 2025 problems as test set; \textbf{(3) AIME$\rightarrow$BeyondAIME}, which uses past years of AIME (AIME 22, AIME 23, and AIME 24) as the training set, and BeyondAIME \citep{beyondaime} as test set, a set of problems at or above AIME difficulty. In addition, we also evaluate on \textbf{(4) Agentic Search} on Natural Questions (NQ) \citep{nq} and HotpotQA \citep{hotpotqa}, where we subsample 196 problems for training and 64 problems for test; the task is multi-hop question answering with search engine API calls within the chain-of-thoughts \citep{search-r1}.
 
 \vspace{-6pt}
-\paragraph{Models} On math tasks, we use DeepSeek v3.1 \citep{deepseekv3}, a 671B MoE \citep{moe} model with 37B active parameters. On agentic search tasks, we use OpenAI's gpt-oss-120b \citep{openai-gpt-oss}, which is a 120B MoE model with 5B active parameters. All finetuning is done via low-rank adaptation \citep{lora} with a rank of $32$.
+\paragraph{Models} On math tasks, we use DeepSeek-v3.1 \citep{deepseekv3}, a 671B MoE \citep{moe} model with 37B active parameters. On agentic search tasks, we use OpenAI's gpt-oss-120b \citep{openai-gpt-oss}, which is a 120B MoE model with 5B active parameters. All finetuning is done via low-rank adaptation \citep{lora} with a rank of $32$.
 
 \vspace{-6pt}
 \paragraph{Methods compared} We compare the following variants:
@@ -365,7 +366,7 @@ Our main evaluations include: \textbf{(1) DAPO100$\rightarrow$AIME25}, which fol
   \centering
   \includegraphics[width=0.98\textwidth]{figures/self_improvement_progress_v2.pdf}
   \vspace{2pt}
-  \caption{\textbf{E-SPL learns faster, and achieves better asymptotic performance that neither RL nor prompt evolution alone could achieve.} By studying the learned system prompts (e.g. \autoref{tab:examples-principles} and \autoref{tab:example-e-spl-1}), we hypothesize that E-SPL achieves this by encouraging a natural division between declarative knowledge (factual information or global heuristics that can be verbally explained) in prompts and procedural knowledge (practical, instinctive ``know-how" that relies on intuition developed through repetition) in weights.}
+  \caption{\textbf{E-SPL learns faster, and achieves better asymptotic performance that neither RL nor prompt evolution alone could achieve.} By studying the learned system prompts (e.g. \autoref{fig:examples-principles} and \autoref{fig:example-e-spl-1}), we hypothesize that E-SPL achieves this by encouraging a natural division between declarative knowledge (factual information or global heuristics that can be verbally explained) in prompts and procedural knowledge (practical, instinctive ``know-how" that relies on intuition developed through repetition) in weights.}
   \label{fig:learning-progress}
   \vspace{-15pt}
 \end{figure}
@@ -380,7 +381,7 @@ Figure \ref{fig:main-results} summarizes performance on math reasoning benchmark
     \item On \textbf{AIME 2025}, E-SPL improves success rate from ${56.3\% \rightarrow 60.6\%}$ over RL-only.
     \item On \textbf{HMMT 2025}, performance improves from ${50.0\% \rightarrow 52.7\%}$ after applying E-SPL.
     \item On an easy-to-hard generalization \citep{easy-to-hard} setting, \textbf{AIME $\rightarrow$ BeyondAIME}, the gains are most pronounced, where E-SPL improves RL from ${38.8\%\rightarrow45.1\%}$ in success rate, capable of learning more generalizable strategies from easier training problems.
-    \item On \textbf{agentic search} tasks, E-SPL improves RL from $44.2\% \rightarrow 48.6\%$, which demonstrates that E-SPL is not limited to mathematical reasoning, but is also effective in agentic reasoning with tool use, where evolved prompts discover novel workflows (\autoref{tab:prompt-evolution-search}).
+    \item On \textbf{agentic search} tasks, E-SPL improves RL from $44.2\% \rightarrow 48.6\%$, which demonstrates that E-SPL is not limited to mathematical reasoning, but is also effective in agentic reasoning with tool use, where evolved prompts discover novel workflows (\autoref{fig:prompt-evolution-search}).
     \item On all tasks above, E-SPL outperforms evolution-only as well, with relative improvements over evolution-only ranging from $+5.8\%$ to $+12.8\%$ on math reasoning tasks, and $+42.9\%$ on the agentic search task.
 \end{itemize}
 \vspace{-5pt}
@@ -441,7 +442,7 @@ For graphs with odd-degree vertices, find a minimum $T$-join by {\color{Midnight
 \caption{
 The discovered system prompts sometimes include \textbf{heuristics that are {\color{Brown}not always true} but still helpful to problem-solving}. Unlike RL updates to model weights, the learned system prompts are interpretable and thus can be monitored and corrected. Here we showcase two subtle mistakes in two discovered principles, and what their {\color{MidnightBlue}\textbf{corrected}} versions should be (see \S\ref{app:mistake-made-by-principle} for explanations).}
 \vspace{-8pt}
-\label{tab:corrected-principles}
+\label{fig:corrected-principles}
 \end{table*}
 
 \begin{figure}[t]
@@ -460,13 +461,13 @@ Notably, the relative strength of RL versus evolution varies by domain --- RL do
 \vspace{-5pt}
 \subsection{Emergent Patterns in Learned System Prompts}
 
-\paragraph{Generative Self-Verification} A recurring theme is generative self-verification \citep{gen-verifier}. In agentic search, the learned system prompt (\autoref{tab:prompt-evolution-search}) specifies a workflow that labels each search result as VERIFIED or NOT VERIFIED based on source reliability and verbatim phrase matching, looping until verification succeeds. In math, a similar strategy emerged: \emph{`perform sanity checks: test small instances, ensure bounds, and verify extreme cases'} (\autoref{tab:example-e-spl-2}). RL then refines execution of these workflows rather than discovering them from scratch.
+\paragraph{Generative Self-Verification} A recurring theme is generative self-verification \citep{gen-verifier}. In agentic search, the learned system prompt (\autoref{fig:prompt-evolution-search}) specifies a workflow that labels each search result as VERIFIED or NOT VERIFIED based on source reliability and verbatim phrase matching, looping until verification succeeds. In math, a similar strategy emerged: \emph{`perform sanity checks: test small instances, ensure bounds, and verify extreme cases'} (\autoref{fig:example-e-spl-2}). RL then refines execution of these workflows rather than discovering them from scratch.
 
 \vspace{-6pt}
-\paragraph{Codified Domain Expertise} E-SPL also codifies domain-specific heuristics — e.g., when to apply the Chinese Remainder Theorem or Möbius inversion (\autoref{tab:example-e-spl-1}, \autoref{tab:example-e-spl-4-short}). These declarative strategies let RL focus on honing core reasoning skills rather than memorizing domain knowledge.
+\paragraph{Codified Domain Expertise} E-SPL also codifies domain-specific heuristics — e.g., when to apply the Chinese Remainder Theorem or Möbius inversion (\autoref{fig:example-e-spl-1}, \autoref{fig:example-e-spl-4-short}). These declarative strategies let RL focus on honing core reasoning skills rather than memorizing domain knowledge.
 
 \vspace{-6pt}
-\paragraph{Failure Mode: Missing Caveats} Not all discovered heuristics are strictly correct — some over-generalize or miss caveats (\autoref{tab:corrected-principles}). However, unlike opaque RL weight updates, E-SPL's learned knowledge is explicit and editable, making it amenable to human monitoring, correction, and scalable oversight \citep{scalable-agent-alignment, scalable-oversight}.
+\paragraph{Failure Mode: Missing Caveats} Not all discovered heuristics are strictly correct — some over-generalize or miss caveats (\autoref{fig:corrected-principles}). However, unlike opaque RL weight updates, E-SPL's learned knowledge is explicit and editable, making it amenable to human monitoring, correction, and scalable oversight \citep{scalable-agent-alignment, scalable-oversight}.
 
 \vspace{-5pt}
 \subsection{Ablation Studies}
@@ -493,7 +494,7 @@ Figure \ref{fig:evo-pol-ablation} shows that using a fixed reference policy $\pi
 \begin{figure}[!tb]
 \centering
 \vspace{-2pt}
-\caption{\textbf{An example of how the RL model utilizes learned system prompts} (also see \autoref{tab:example-e-spl-4}).}
+\caption{\textbf{An example of how the RL model utilizes learned system prompts} (also see \autoref{fig:example-e-spl-4}).}
 \vspace{-8pt}
 \begin{runcard}[title={Example of How E-SPL Shapes Model Behavior}]
 
@@ -534,7 +535,7 @@ Let $S$ be the set of all positive integers less than $143$ that are relatively 
 
 \textbf{Ground truth answer:} $5940$
 \end{runcard}
-\label{tab:example-e-spl-4-short}
+\label{fig:example-e-spl-4-short}
 
 \vspace{-10pt}
 \end{figure}
@@ -802,7 +803,7 @@ Mutation-only behaves more like independent local hill-climbs along separate lin
 
 \subsection{Discovered System Prompt for Agentic Search}
 
-\autoref{tab:prompt-evolution-search} shows the full system prompt discovered by E-SPL for the agentic search task, including the workflow before and after evolution.
+\autoref{fig:prompt-evolution-search} shows the full system prompt discovered by E-SPL for the agentic search task, including the workflow before and after evolution.
 
 \begin{figure}[!tb]
 \centering
@@ -810,7 +811,7 @@ Mutation-only behaves more like independent local hill-climbs along separate lin
 \caption{\centering
 \textbf{An example of the system prompt discovered by E-SPL for RL with search engines. Here, the discovered system prompt specifies a workflow that includes: {\color{Brown}\textbf{generative self-verification}, \textbf{detailed instructions on tool use}, \textbf{critical formatting rules}, \textbf{heuristics for determining the reliability of various information sources}, \textbf{actionable guidance for avoiding common failure modes}, etc.}}
 }
-\label{tab:prompt-evolution-search}
+\label{fig:prompt-evolution-search}
 
 \begin{runcard}[title={System Prompt for RL Agent with Search Engine (openai gpt-oss-120b)}]
 
@@ -901,7 +902,7 @@ before you \emph{everr} write the final \texttt{Answer:} line.
 
 \subsection{Additional Examples of E-SPL Model Behavior}
 
-\autoref{tab:example-e-spl-1} and \autoref{tab:example-e-spl-2} provide detailed examples of how the RL model learns to utilize principles from learned system prompts to solve challenging math problems.
+\autoref{fig:example-e-spl-1} and \autoref{fig:example-e-spl-2} provide detailed examples of how the RL model learns to utilize principles from learned system prompts to solve challenging math problems.
 
 \begin{figure}[!tb]
 \centering
@@ -965,7 +966,7 @@ So the smallest composite would be one that has no prime factor $<=101$, i.e., a
 
 \textbf{Ground truth answer:} $11021$
 \end{runcard}
-\label{tab:example-e-spl-1}
+\label{fig:example-e-spl-1}
 
 \end{figure}
 
@@ -1037,7 +1038,7 @@ So the maximum is $M = 2^{3525}$. Then $M \mod 1000 = 2^{3525} \mod 1000$. \quad
 
 \textbf{Ground truth answer:} $432$
 \end{runcard}
-\label{tab:example-e-spl-2}
+\label{fig:example-e-spl-2}
 
 \end{figure}
 \section{TrueSkill-Based Fitness Modeling for E-SPL}
@@ -1444,7 +1445,7 @@ query_list: string[],
 
 \newpage
 
-\subsection{Learned System Prompts on Math Datasets with DeepSeek v3.1}
+\subsection{Learned System Prompts on Math Datasets with DeepSeek-v3.1}
 
 
 \begin{table}[h]
@@ -1728,7 +1729,7 @@ Given the numbers, it is close. Perhaps with the correct non-degenerate placemen
 
 \textbf{Ground truth answer:} {\color{red}$8.5$}
 \end{runcard}
-\label{tab:example-e-spl-6}
+\label{fig:example-e-spl-6}
 
 \end{figure}
 
@@ -1805,7 +1806,7 @@ Thus, the number of ways is \(6^4 = 1296\). The answer is \(1296\).
 
 \textbf{Ground truth answer:} $1296$
 \end{runcard}
-\label{tab:example-e-spl-3}
+\label{fig:example-e-spl-3}
 
 \end{figure}
 
@@ -1878,7 +1879,7 @@ Given the complexity, and since the problem asks for the minimal \(n \geq 866\),
 
 \textbf{Ground truth answer:} {\color{red}$876$}
 \end{runcard}
-\label{tab:example-e-spl-5}
+\label{fig:example-e-spl-5}
 
 \end{figure}
 
@@ -1942,7 +1943,7 @@ Problem: Let \( S \) be the set of all positive integers less than \( 143 \) tha
 
 \textbf{Ground truth answer:} $5940$
 \end{runcard}
-\label{tab:example-e-spl-4}
+\label{fig:example-e-spl-4}
 
 \end{figure}
 
