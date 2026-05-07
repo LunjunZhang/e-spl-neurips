@@ -8,4 +8,4 @@
 *.fdb_latexmk
 *.synctex.gz
 .DS_Store
-code.zip
+*.zip
